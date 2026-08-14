@@ -5,13 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
-	"sort"
 	"sync"
 	"time"
 
 	"openipreporter/internal/capture"
 	"openipreporter/internal/export"
 	"openipreporter/internal/parse"
+	"openipreporter/internal/site"
 	"openipreporter/internal/walk"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -42,6 +42,7 @@ type App struct {
 	// broadcast, which is exactly the dead end Whatsminer produced.
 	unknown map[int]int
 
+	layoutErr  string // why the can list fell back to defaults, if it did
 	listening  bool
 	boundPorts int
 	exported   string // filename of the most recent export, for the status bar
@@ -49,6 +50,8 @@ type App struct {
 	listenDone <-chan struct{}
 
 	sessionDir string
+	cansPath   string
+	layout     site.Site
 }
 
 func NewApp() *App {
@@ -56,11 +59,17 @@ func NewApp() *App {
 		lastReport: map[string]time.Time{},
 		unknown:    map[int]int{},
 		sessionDir: "sessions",
+		cansPath:   "cans.json",
+		// Seeded so the app is usable before startup has read the file, and so
+		// a failure to read it later degrades to the defaults rather than to an
+		// empty list with no cans to pick.
+		layout: site.Default(),
 	}
 }
 
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	a.loadLayout()
 	a.startListening()
 }
 
@@ -170,13 +179,19 @@ func (a *App) onPacket(p capture.Packet) {
 	}
 
 	expected := a.session.Can
+	// The can is inferred from the source address using one site's addressing
+	// scheme. Somewhere else that inference is meaningless, and a name it
+	// invents will not be in the can list — so only speak up when the derived
+	// can is one this site actually has. Silence beats crying wolf on every
+	// single capture at a site the scheme was never written for.
+	knownCan := rep.Can != "" && a.layout.Has(rep.Can)
 	a.save()
 	a.mu.Unlock()
 
 	// A report from a can other than the one being walked is worth saying out
 	// loud: either the walk is in the wrong place, or broadcasts are crossing
 	// cans and the operator needs to know before trusting the rack.
-	if rep.Can != "" && rep.Can != expected {
+	if knownCan && rep.Can != expected {
 		a.emit("notice", fmt.Sprintf("That machine answered from %s, not %s — check you are in the right can.", rep.Can, expected))
 	}
 	a.emit("captured", rep.MAC)
@@ -201,16 +216,62 @@ func (a *App) emit(event string, data ...any) {
 
 // --- session lifecycle -----------------------------------------------------
 
+// loadLayout reads the site's can list, falling back to the built-in defaults
+// if the file is unreadable so the window still opens and the problem can be
+// fixed in the editor rather than in a text file.
+func (a *App) loadLayout() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	loaded, err := site.Load(a.cansPath)
+	if err != nil {
+		a.layout = site.Default()
+		a.layoutErr = err.Error()
+		return
+	}
+	a.layout = loaded
+	a.layoutErr = ""
+}
+
+// Layout returns the current can list, for the editor.
+func (a *App) Layout() []site.Can {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if len(a.layout.Cans) == 0 {
+		a.layout = site.Default()
+	}
+	return a.layout.Cans
+}
+
+// SaveLayout replaces the can list. It refuses anything that would not
+// describe a real set of racks, and says which entry is wrong.
+func (a *App) SaveLayout(cans []site.Can) State {
+	next := site.Site{Cans: cans}.Normalise()
+	if err := next.Validate(); err != nil {
+		a.mu.Lock()
+		defer a.mu.Unlock()
+		return a.stateLocked(err.Error())
+	}
+	if err := next.Save(a.cansPath); err != nil {
+		a.mu.Lock()
+		defer a.mu.Unlock()
+		return a.stateLocked(err.Error())
+	}
+
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.layout = next
+	a.layoutErr = ""
+	return a.stateLocked("")
+}
+
 // Cans lists the cans that can be walked, in floor order.
 func (a *App) Cans() []string {
-	cans := []string{"A1", "A2", "A5", "A6", "A7", "A8", "B1", "B2", "B3", "B4", "O1", "O2", "O3"}
-	sort.SliceStable(cans, func(i, j int) bool {
-		if cans[i][0] != cans[j][0] {
-			return cans[i][0] < cans[j][0]
-		}
-		return cans[i][1:] < cans[j][1:]
-	})
-	return cans
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if len(a.layout.Cans) == 0 {
+		a.layout = site.Default()
+	}
+	return a.layout.Names()
 }
 
 // StartSession begins a walk, resuming a saved one for the same rack if there
@@ -220,9 +281,10 @@ func (a *App) StartSession(can string, rack int) State {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	g, ok := walk.DefaultGeometry(can)
+	g, ok := a.layout.Geometry(can)
 	if !ok {
-		return a.stateLocked(fmt.Sprintf("%s is not a can that can be walked", can))
+		return a.stateLocked(fmt.Sprintf(
+			"%q is not in the can list — add it under Cans", can))
 	}
 
 	path := a.pathFor(can, rack)

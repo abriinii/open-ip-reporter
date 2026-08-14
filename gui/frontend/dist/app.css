@@ -235,3 +235,69 @@ td.note { color: var(--text-2); white-space: nowrap; overflow: hidden; text-over
 .menu-val { display: block; color: var(--text-3); font: 11px var(--mono); margin-top: 1px; }
 .menu button small { display: block; color: var(--text-3); font-size: 11px; margin-top: 1px; }
 .menu-sep { height: 1px; background: var(--line); margin: 4px 2px; }
+
+/* ---------- can editor ---------- */
+
+.can-row { display: flex; gap: 6px; }
+.can-row select { flex: 1; min-width: 0; }
+.can-row .tool { height: 34px; border-color: var(--line); border-bottom-color: var(--text-3); flex: 0 0 auto; }
+
+.overlay {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(0,0,0,.32);
+  display: flex; align-items: center; justify-content: center;
+  padding: 40px 20px;
+}
+.overlay.hidden { display: none; }
+
+.dialog {
+  width: 560px; max-height: 100%;
+  display: flex; flex-direction: column;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 16px 48px rgba(0,0,0,.28);
+}
+.dlg-head { padding: 18px 20px 14px; border-bottom: 1px solid var(--line); }
+.dlg-head h2 { font: 600 16px var(--ui); }
+.dlg-head p { margin-top: 5px; font-size: 12px; color: var(--text-2); line-height: 1.5; }
+.dlg-head code { font: 11px var(--mono); background: var(--row-alt); padding: 1px 4px; border-radius: 3px; }
+
+.dlg-body { padding: 14px 20px; overflow-y: auto; flex: 1; }
+.cans-table { width: 100%; border-collapse: collapse; }
+.cans-table th {
+  text-align: left; font: 600 11px var(--ui); color: var(--text-2);
+  padding: 0 8px 7px; border-bottom: 1px solid var(--line);
+}
+.cans-table th.n { text-align: right; width: 76px; }
+.cans-table td { padding: 4px 8px; border-bottom: 1px solid var(--line-soft); }
+.cans-table input {
+  width: 100%; height: 30px; padding: 0 8px;
+  background: var(--card); color: var(--text);
+  border: 1px solid var(--line); border-bottom-color: var(--text-3);
+  border-radius: 4px; font: 13px var(--ui);
+}
+.cans-table input.num { text-align: right; font-variant-numeric: tabular-nums; }
+.cans-table td.pos { text-align: right; font: 13px var(--mono); color: var(--text-3); }
+.cans-table td.del { width: 32px; }
+.rm {
+  width: 26px; height: 26px; padding: 0; line-height: 1;
+  background: transparent; border: 1px solid transparent; border-radius: 4px;
+  color: var(--text-3); cursor: pointer; font-size: 15px;
+}
+.rm:hover { color: var(--bad); border-color: var(--line); }
+.addcan { margin-top: 12px; border-color: var(--line); }
+
+.dlg-foot {
+  display: flex; align-items: center; gap: 10px;
+  padding: 13px 20px; border-top: 1px solid var(--line);
+}
+.dlg-err { flex: 1; font-size: 12px; color: var(--bad); }
+.primary-sm {
+  height: 32px; padding: 0 18px;
+  background: var(--accent); color: #fff;
+  border: 1px solid transparent; border-radius: 5px;
+  font: 600 13px var(--ui); cursor: pointer;
+}
+.primary-sm:hover { background: var(--accent-hover); }
+@media (prefers-color-scheme: dark) { .primary-sm { color: #08151f; } }

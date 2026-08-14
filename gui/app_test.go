@@ -2,18 +2,23 @@ package main
 
 import (
 	"context"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"openipreporter/internal/capture"
 	"openipreporter/internal/export"
+	"openipreporter/internal/site"
 )
 
 func newTestApp(t *testing.T) *App {
 	t.Helper()
 	a := NewApp()
-	a.sessionDir = t.TempDir()
+	dir := t.TempDir()
+	a.sessionDir = dir
+	// Never let a test write a can list into the working copy.
+	a.cansPath = filepath.Join(dir, "cans.json")
 	return a
 }
 
@@ -317,5 +322,71 @@ func TestCopyRefusesWhenThereIsNothingToCopy(t *testing.T) {
 	}
 	if clipboard != "untouched" {
 		t.Errorf("clipboard was written as %q despite there being nothing to copy", clipboard)
+	}
+}
+
+// The can list is what makes this usable at a second site.
+func TestCanListDrivesWhatCanBeWalked(t *testing.T) {
+	a := newTestApp(t)
+	a.cansPath = filepath.Join(t.TempDir(), "cans.json")
+	a.loadLayout()
+
+	// A site with entirely different names and a rack bigger than any here.
+	st := a.SaveLayout([]site.Can{
+		{Name: "Shed", Rows: 12, Columns: 8},
+		{Name: "Barn", Rows: 4, Columns: 3},
+	})
+	if st.Error != "" {
+		t.Fatalf("SaveLayout: %s", st.Error)
+	}
+	if got := a.Cans(); len(got) != 2 || got[0] != "Barn" || got[1] != "Shed" {
+		t.Errorf("Cans() = %v, want [Barn Shed]", got)
+	}
+
+	st = a.StartSession("Shed", 1)
+	if st.Error != "" || !st.Active {
+		t.Fatalf("could not walk a foreign can: %q", st.Error)
+	}
+	if st.Positions != 96 {
+		t.Errorf("Shed has %d positions, want 96", st.Positions)
+	}
+
+	// And the old site's cans are gone.
+	if st := a.StartSession("B1", 1); st.Error == "" {
+		t.Error("walked a can that is not in the list")
+	}
+}
+
+func TestSaveLayoutRefusesNonsenseAndKeepsTheOldList(t *testing.T) {
+	a := newTestApp(t)
+	a.cansPath = filepath.Join(t.TempDir(), "cans.json")
+	a.loadLayout()
+	before := len(a.Cans())
+
+	if st := a.SaveLayout([]site.Can{{Name: "Broken", Rows: 0, Columns: 5}}); st.Error == "" {
+		t.Error("saved a can with no rows")
+	}
+	if got := len(a.Cans()); got != before {
+		t.Errorf("a rejected save changed the list: %d cans, want %d", got, before)
+	}
+}
+
+// At a site whose addressing does not match the scheme, the inferred can is
+// meaningless and must not produce a warning on every capture.
+func TestNoWrongCanWarningForCansThisSiteDoesNotHave(t *testing.T) {
+	a := newTestApp(t)
+	a.cansPath = filepath.Join(t.TempDir(), "cans.json")
+	a.loadLayout()
+	a.SaveLayout([]site.Can{{Name: "Shed", Rows: 12, Columns: 8}})
+	a.StartSession("Shed", 1)
+
+	// 22.x derives as "B2", which this site has never heard of.
+	a.onPacket(antminerPacket("22.1.1.10", "02:81:f5:ea:e1:db", time.Now()))
+
+	if n := len(a.State().Entries); n != 1 {
+		t.Fatalf("recorded %d rows, want 1", n)
+	}
+	if a.State().Error != "" {
+		t.Errorf("warned about a can this site does not have: %q", a.State().Error)
 	}
 }

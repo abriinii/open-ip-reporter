@@ -73,3 +73,6 @@ Thumbs.db
 # Stray binaries from "go build ./..." inside the app module.
 /gui/gui
 /gui/gui.exe
+
+# Site layout, written next to the app. Local to each install.
+/cans.json

@@ -322,6 +322,98 @@ async function editRowPosition(i) {
   } finally { prompting = false; }
 }
 
+// ---------- can editor ----------
+//
+// Site setup, touched once. Kept in a dialog so none of it is in the way while
+// walking a rack.
+
+let draft = [];
+
+function renderCans() {
+  const body = $("cansrows");
+  body.innerHTML = "";
+  draft.forEach((c, i) => {
+    const tr = document.createElement("tr");
+    const positions = (c.rows > 0 && c.columns > 0) ? c.rows * c.columns : "";
+    tr.innerHTML =
+      `<td><input data-i="${i}" data-f="name" value="${esc(c.name)}" placeholder="e.g. B1"></td>` +
+      `<td><input data-i="${i}" data-f="rows" class="num" type="number" min="1" value="${c.rows || ""}"></td>` +
+      `<td><input data-i="${i}" data-f="columns" class="num" type="number" min="1" value="${c.columns || ""}"></td>` +
+      `<td class="pos">${positions}</td>` +
+      `<td class="del"><button class="rm" data-rm="${i}" title="Remove">&times;</button></td>`;
+    body.appendChild(tr);
+  });
+}
+
+$("cansrows").addEventListener("input", (ev) => {
+  const el = ev.target;
+  const i = el.dataset.i;
+  if (i === undefined) return;
+  const f = el.dataset.f;
+  draft[i][f] = f === "name" ? el.value : parseInt(el.value, 10) || 0;
+  // Only the positions column needs recomputing; redrawing the whole table
+  // would take the caret out of the box being typed in.
+  const cell = el.closest("tr").querySelector("td.pos");
+  const c = draft[i];
+  cell.textContent = (c.rows > 0 && c.columns > 0) ? c.rows * c.columns : "";
+});
+
+$("cansrows").addEventListener("click", (ev) => {
+  const i = ev.target.dataset?.rm;
+  if (i === undefined) return;
+  draft.splice(i, 1);
+  renderCans();
+});
+
+$("addcan").onclick = () => {
+  draft.push({ name: "", rows: 10, columns: 5 });
+  renderCans();
+  const inputs = $("cansrows").querySelectorAll('input[data-f="name"]');
+  inputs[inputs.length - 1]?.focus();
+};
+
+async function openCans() {
+  draft = ((await call("Layout")) || []).map((c) => ({ ...c }));
+  if (draft.length === 0) draft.push({ name: "", rows: 10, columns: 5 });
+  $("cans-error").textContent = "";
+  renderCans();
+  $("cansdlg").classList.remove("hidden");
+  prompting = true; // the walking shortcuts must not fire behind the dialog
+}
+
+function closeCans() {
+  $("cansdlg").classList.add("hidden");
+  prompting = false;
+}
+
+$("editcans").onclick = openCans;
+$("cans-cancel").onclick = closeCans;
+$("cans-save").onclick = async () => {
+  const s = await call("SaveLayout", draft);
+  if (!s) return;
+  if (s.error) { $("cans-error").textContent = s.error; return; }
+  closeCans();
+  await refreshCans();
+  render(s);
+};
+document.addEventListener("keydown", (ev) => {
+  if (ev.key === "Escape" && !$("cansdlg").classList.contains("hidden")) closeCans();
+});
+
+// Rebuild the dropdown, keeping the current pick if it still exists.
+async function refreshCans() {
+  const sel = $("can");
+  const previous = sel.value;
+  const cans = (await call("Cans")) || [];
+  sel.innerHTML = "";
+  cans.forEach((c) => {
+    const o = document.createElement("option");
+    o.value = c; o.textContent = c;
+    sel.appendChild(o);
+  });
+  if (cans.includes(previous)) sel.value = previous;
+}
+
 // ---------- start / stop ----------
 
 async function boot() {

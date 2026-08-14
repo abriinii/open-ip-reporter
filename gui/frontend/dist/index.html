@@ -15,7 +15,10 @@
   <section class="controls">
     <div class="field">
       <label for="can">Can</label>
-      <select id="can"></select>
+      <div class="can-row">
+        <select id="can"></select>
+        <button id="editcans" class="tool" title="Add or edit the cans at this site">Cans…</button>
+      </div>
     </div>
     <div class="field narrow">
       <label for="rack">Rack</label>
@@ -71,6 +74,33 @@
     </footer>
   </section>
 </main>
+
+<!-- Set up once per site. Deliberately out of the walking screen. -->
+<div id="cansdlg" class="overlay hidden">
+  <div class="dialog">
+    <header class="dlg-head">
+      <h2>Cans at this site</h2>
+      <p>The rack shape for each can. Saved to <code>cans.json</code> next to the
+         app — copy that file to set up another machine the same way.</p>
+    </header>
+
+    <div class="dlg-body">
+      <table class="cans-table">
+        <thead>
+          <tr><th>Can</th><th class="n">Rows</th><th class="n">Columns</th><th class="n">Positions</th><th></th></tr>
+        </thead>
+        <tbody id="cansrows"></tbody>
+      </table>
+      <button id="addcan" class="tool addcan">+ Add a can</button>
+    </div>
+
+    <footer class="dlg-foot">
+      <span id="cans-error" class="dlg-err"></span>
+      <button id="cans-cancel" class="tool">Cancel</button>
+      <button id="cans-save" class="primary-sm">Save</button>
+    </footer>
+  </div>
+</div>
 
 <!-- Right-click a row. Everything here is also on a key. -->
 <div id="ctx" class="menu hidden">

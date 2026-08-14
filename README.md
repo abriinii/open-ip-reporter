@@ -175,7 +175,24 @@ because that would make an unfinished walk look finished.
 
 ---
 
+## Using it at another site
+
+The can list is not baked into the program. Press **Cans…** next to the can
+dropdown to add, edit or remove cans and set the rack shape for each one.
+
+It is saved as `cans.json` next to the app, so setting up a second machine is a
+matter of copying that one file across. A fresh install writes the list below
+as a starting point; replacing it entirely is the expected thing to do
+somewhere else.
+
+One thing that does not travel: the can is normally inferred from a report's
+source address using this site's addressing scheme. Somewhere addressed
+differently that inference simply does not apply, and the app stays quiet
+rather than warning about cans that do not exist there.
+
 ## Cans and racks
+
+The defaults for this site, editable under **Cans…**:
 
 | Cans | Rows | Columns | Positions |
 |---|---|---|---|

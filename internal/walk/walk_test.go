@@ -415,31 +415,6 @@ func TestNewSessionRejectsNonsense(t *testing.T) {
 		t.Error("empty geometry accepted")
 	}
 }
-
-func TestDefaultGeometryMatchesTheSite(t *testing.T) {
-	for _, can := range []string{"A1", "A2", "A5", "A6", "A7", "A8", "B1", "B2", "B3", "B4"} {
-		g, ok := DefaultGeometry(can)
-		if !ok || g.Positions() != 50 {
-			t.Errorf("%s geometry %v (%d positions), want 50", can, g, g.Positions())
-		}
-	}
-	for _, can := range []string{"O1", "O2", "O3"} {
-		g, ok := DefaultGeometry(can)
-		if !ok || g.Positions() != 48 {
-			t.Errorf("%s geometry %v (%d positions), want 48", can, g, g.Positions())
-		}
-	}
-	// A3 and A4 are out of commission, and there is no O4 — 34.x is the
-	// testbench. None may be offered as walkable.
-	for _, can := range []string{"A3", "A4", "O4"} {
-		if _, ok := DefaultGeometry(can); ok {
-			t.Errorf("%s has a geometry, but it is not a walkable can", can)
-		}
-	}
-}
-
-// Editing the position boxes mid-walk: the next machine lands where you say,
-// and the rack carries on from there. Nothing already recorded moves.
 func TestSetNextPositionMovesTheWalkOnly(t *testing.T) {
 	s := newTestSession(t, b1)
 	s.Record("02:00:00:00:00:01", "", "Antminer", time.Now())
@@ -510,33 +485,5 @@ func TestPendingPositionSurvivesReload(t *testing.T) {
 	}
 	if n, _ := got.NextPosition(); n.Column != 3 || n.Row != 7 {
 		t.Errorf("after reload next is %s, want C3/7", n.Short())
-	}
-}
-
-// Fifty is the most machines any rack here holds, so geometry that implies
-// more cannot be real and must be refused before it creates positions no
-// machine can occupy.
-func TestGeometryIsBoundedByWhatTheSiteActuallyHas(t *testing.T) {
-	for _, g := range []Geometry{
-		{Rows: 10, Columns: 6}, // 60
-		{Rows: 12, Columns: 5}, // 60
-		{Rows: 8, Columns: 7},  // 56
-	} {
-		if g.Valid() {
-			t.Errorf("%dx%d (%d positions) accepted, want refusal above %d",
-				g.Rows, g.Columns, g.Positions(), MaxPositions)
-		}
-		if _, err := NewSession("B1", 1, g); err == nil {
-			t.Errorf("NewSession accepted %dx%d", g.Rows, g.Columns)
-		}
-	}
-	for _, g := range []Geometry{
-		{Rows: 10, Columns: 5}, // 50, an A or B rack
-		{Rows: 8, Columns: 6},  // 48, an outdoor rack of Whatsminers
-		{Rows: 8, Columns: 5},  // 40
-	} {
-		if !g.Valid() {
-			t.Errorf("%dx%d (%d positions) refused, want accepted", g.Rows, g.Columns, g.Positions())
-		}
 	}
 }
