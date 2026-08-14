@@ -8,26 +8,27 @@ position with every captured report**, so serial/MAC correlation is a direct
 join instead of an assumption that row *n* of a CSV is grid position *n*. One
 missed machine no longer silently shifts every pairing after it.
 
-> **Status: Phase 0 — capture only.**
-> This build records what miners broadcast so the parsers can be written
-> against real traffic. It does not yet track position or export CSVs.
-> See [What works today](#what-works-today).
-
 ---
 
-## Download and run
+## Which file do I download?
 
-1. Go to the [**Releases**](../../releases/latest) page and download the file for your machine:
-   - **macOS (Apple Silicon)** — `ipreporter-macos-arm64`
-   - **Windows 11** — `ipreporter-windows-x64.exe`
+Go to the [**Releases**](../../releases/latest) page. There are two different
+programs there — you almost certainly want the first one.
 
-2. **The laptop must be plugged into the miner network.** The reports are
-   layer-2 UDP broadcasts. They do not cross a router, a VPN, or a Tailscale
-   subnet route — only a machine physically on that segment can hear them.
+| Download this | If you want |
+|---|---|
+| **`BetterIPReporter-windows-x64.exe`**<br>**`BetterIPReporter-macos-arm64.zip`** | **The app.** A window you walk a rack with. This is the one. |
+| `capture-tool-windows-x64.exe`<br>`capture-tool-macos-arm64` | A command-line tool for recording raw miner broadcasts. Only needed when a miner type is not recognised yet and its wire format has to be worked out. |
 
-### Windows
+Nothing to install either way. One file, download and run.
 
-Double-click `ipreporter-windows-x64.exe`. Two prompts, both expected:
+**The laptop must be plugged into the miner network.** The reports are layer-2
+UDP broadcasts. They do not cross a router, a VPN, or a Tailscale subnet route
+— only a machine physically on that segment can hear them.
+
+### First run on Windows
+
+Two prompts, both expected:
 
 1. **"Windows protected your PC"** (SmartScreen, because the binary is
    unsigned). Click **More info**, then **Run anyway**. If there is no "More
@@ -35,183 +36,167 @@ Double-click `ipreporter-windows-x64.exe`. Two prompts, both expected:
    bottom → **OK**, then run it again.
 
 2. **Windows Defender Firewall** asks whether to allow it. **Click Allow, and
-   make sure "Private networks" is ticked.** If you miss this prompt the tool
-   runs but hears nothing. An administrator has to click it.
+   make sure "Private networks" is ticked.** Miss this and the app runs but
+   hears nothing. An administrator has to click it.
 
-### macOS
+### First run on macOS
 
-macOS blocks unsigned downloads, so it takes two commands the first time. In
-Terminal, in the folder you downloaded to:
+Unzip, then right-click the app → **Open** → **Open**. Gatekeeper blocks
+unsigned apps on a double-click but allows them through this path. You only do
+it once.
 
-```bash
-chmod +x ipreporter-macos-arm64 && xattr -d com.apple.quarantine ipreporter-macos-arm64
-```
-
-Then run it:
+For the command-line tool, which is a bare binary rather than an app bundle:
 
 ```bash
-./ipreporter-macos-arm64
+chmod +x capture-tool-macos-arm64
+xattr -d com.apple.quarantine capture-tool-macos-arm64
 ```
 
-If macOS still refuses, open **System Settings → Privacy & Security**, scroll
-down, and click **Open Anyway** next to the blocked app.
-
-<sub>Signing the binaries would remove this step entirely. It costs $99/year for
-an Apple Developer account plus a notarization step in the release workflow.
-Worth doing if handing this to other techs becomes routine; not worth it for
-one laptop.</sub>
+Signing would remove all of this, at $99/year for an Apple Developer account.
+Worth it only if this gets handed to people who should not have to be told.
 
 ---
 
-## What works today
+## Walking a rack
 
-Press a miner's IP-report button and the tool records the broadcast:
+1. Pick the **Can** and **Rack**, press **Start**.
+2. Walk. Press each miner's IP-report button; the row appears on its own. No
+   dialog to dismiss.
+3. Press **Space** at an empty slot, a switch, or a machine that will not
+   report. The position is held open, which is what keeps everything after it
+   aligned.
+4. Press **Export CSV** at the end of the rack.
 
-```
-#1  14:22:07.418
-  from 10.4.19.55:51234  ->  udp/14235   (56 bytes)
-  ascii: ...........Z;.10.4.19.55.
-  00000000  00 01 00 14 00 00 00 00  c4 11 1e 5a 3b 7f 31 30  |...........Z;.10|
-  00000010  2e 34 2e 31 39 2e 35 35  00                       |.4.19.55.|
-```
+The **Row** and **Column** boxes show where the next machine will land. If you
+are off by one, type the right numbers in — the walk moves, nothing already
+recorded is touched, and the rest of the rack follows on from there.
 
-Press **Ctrl-C** to stop. It writes two files into a `captures/` folder:
+### Keys
 
-| File | What it is |
+| Key | Does |
 |---|---|
-| `capture-*.jsonl` | One JSON record per packet. This is the one parsers get built from. |
-| `capture-*.txt` | The same data as readable hex dumps, plus your network interfaces and a summary. |
+| <kbd>Space</kbd> | Skip a position. The only key you press regularly. |
+| <kbd>↑</kbd> <kbd>↓</kbd> | Pick a row |
+| <kbd>Enter</kbd> | Edit that row's MAC by hand |
+| <kbd>N</kbd> | Edit that row's note |
+| <kbd>P</kbd> | Set that row's position |
+| <kbd>I</kbd> | Insert a blank above it (everything below shifts down) |
+| <kbd>Del</kbd> | Delete it (everything below shifts up) |
+| <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd> | Undo / redo |
 
-**Send both files back.** That is the whole job of Phase 0.
+Right-clicking a row does the same things, if your hands are already on the
+mouse.
 
-### What to capture
+### Duplicates are refused, not listed
 
-One button press per miner type is enough, but a few of each is better:
+A MAC already in the rack will not be recorded a second time. You get
+`Already recorded at C1/5`, and the position does **not** advance — the next
+real machine takes it.
 
-- **Antminer** — the known case, confirms the tool works.
-- **Whatsminer** (`BTM`/`ZDM`/`HTM` serials) — the important unknown. Their own
-  WhatsMinerTool can do IP reports, so the miners emit *something*; we need to
-  see what and on which port.
-- **Avalon** (`AME`) and **SealMiner** (`S12`) — grab them if convenient.
+This is deliberate. A duplicate is a double press or a miner heard twice, and
+writing it would consume a position belonging to a real machine, shifting
+everything after it by one.
 
-Note which miner type you pressed and roughly when, so the packets can be told
-apart in the log.
+Antminers send every report **twice, one second apart**, by design. That pair
+is collapsed into one press before any of this applies, so the refusal only
+ever fires on a genuine repeat.
 
-### Decoding a capture
+### Nothing is lost if the laptop sleeps
 
-```
-ipreporter parse captures/capture-20260813-232940.jsonl
-```
+The walk is saved to `sessions/` after every capture. Starting the same can and
+rack again picks up where it left off.
 
-```
-  68 packets read.  4 were miner reports, collapsing to 2 button presses.
-  2 were the miner's own repeat of a report it had just sent.
+---
 
-  #    TIME         IP             MAC                 VENDOR    CAN
-  ────────────────────────────────────────────────────────────────────
-  1    23:30:21     21.1.1.43      02:81:f5:ea:e1:db   Antminer  B1
-  2    23:30:25     21.1.11.232    02:ad:af:02:ff:45   Antminer  B1
-```
+## The exported CSV
 
-**Antminers send every report twice, one second apart.** That is the miner's
-design, not a double press. The parser folds the pair into one press, because
-otherwise every machine on site would look like a duplicate.
-
-A MAC that reports again *outside* that window is a real duplicate — a double
-tap, or the same machine walked past twice — and gets flagged loudly, because
-that is one of the main ways a site map gets silently corrupted.
-
-### Commands
+One file per rack. Row *n* is grid position *n*, and a skipped position is a
+blank row — the same shape the existing process already consumes.
 
 ```
-ipreporter                 record miner broadcasts
-ipreporter parse FILE      decode a capture into miner reports
-ipreporter ports           list the UDP ports it listens on
-ipreporter sniff           how to find a port it cannot see (read this if a press produces nothing)
-ipreporter version         print version
+21.1.1.43,02:81:f5:ea:e1:db
+,
+21.1.11.232,02:ad:af:02:ff:45
 ```
 
-Flags for `capture`:
+If any row in the rack has a **note**, a third column is added to that file:
 
 ```
--out DIR        where to write capture files       (default "captures")
--ports LIST     listen on exactly these ports      e.g. "14235,8888,14200-14300"
--add LIST       listen on the defaults plus these  e.g. "48899,9527"
--mute LIST      keep these ports off the screen    e.g. "10001"
-                (they are still recorded in full)
--quiet          do not print each packet to the screen
+21.1.1.43,02:81:f5:ea:e1:db,
+,,wont ip report
+21.1.11.232,02:ad:af:02:ff:45,
 ```
 
-### If you press a button and nothing appears
+A rack with no notes exports exactly the two-column form, so nothing changes
+downstream for a field usually left blank.
 
-The tool hears a port by **binding** it, so it only hears ports it was told
-about. 14235 (Antminer) is known; other vendors' ports are guesses right now.
+A rack walked halfway exports halfway. It is not padded out to a full rack,
+because that would make an unfinished walk look finished.
 
-Run `ipreporter sniff`. It prints the exact `tcpdump` command for your Mac —
-tcpdump ships with macOS, needs no install, and sees **every** port. One run
-identifies the port permanently.
+---
+
+## Cans and racks
+
+| Cans | Rows | Columns | Positions |
+|---|---|---|---|
+| A1, A2, A5, A6, A7, A8, B1–B4 | 10 | 5 | 50 |
+| O1, O2, O3 (outdoor) | 8 | 6 | 48 |
+
+A3 and A4 are out of commission. There is no O4 — `34.x` is the testbench, and
+a capture from that range labels itself as such.
+
+The can is derived from the source address of every report: the first octet
+encodes it, `1x` → A, `2x` → B, `3x` → O. A machine answering from `15.4.9.113`
+is in A5. If a report arrives from a different can than the one being walked,
+the app says so rather than recording it quietly.
+
+---
+
+## The capture tool
+
+Only needed when a miner type is not recognised yet.
+
+```
+capture-tool                 record miner broadcasts
+capture-tool parse FILE      decode a capture into miner reports
+capture-tool ports           list the UDP ports it listens on
+capture-tool sniff           how to find a port it cannot see
+```
+
+It binds ~77 candidate UDP ports and logs every packet with source, port, hex
+and ASCII, to a file that can be sent on for a parser to be written against.
+Antminer's port 14235 is known; everything else was found this way.
+
+**If a press produces nothing**, the miner is using a port not in the list.
+`capture-tool sniff` prints the exact `tcpdump` line for your machine, which
+sees every port with nothing to install. One run finds it permanently.
 
 ### Background noise is normal
 
-The moment you start it you will see traffic, before you touch a single miner.
-That is the network talking to itself, and it means the tool is working.
+Traffic appears the moment it starts, before you touch a miner. The most common
+is a 4-byte `01 00 00 00` on **udp/10001** every ~10 seconds from a pile of
+`.254` addresses — that is Ubiquiti UniFi device discovery, not miners.
 
-The most common one on a mining site is a 4-byte `01 00 00 00` on **udp/10001**
-arriving every ~10 seconds from a pile of `.254` addresses. That is **Ubiquiti
-UniFi device discovery** — your switches and gateways announcing themselves,
-not miners.
+Repeated identical payloads collapse to a count automatically, and `-mute 10001`
+silences a port entirely. Neither affects the capture files: everything
+received is always written to disk in full.
 
-Two things keep it from burying a real report:
+---
 
-- **Repeated identical payloads collapse automatically.** The first few print in
-  full, then the tool counts the rest instead of printing them. Two miners
-  reporting always produce two *different* payloads (the MAC is in there), so
-  this only ever hides beacons.
-- **`-mute` silences a port entirely** if you want it gone:
+## Supported miners
 
-  ```
-  ipreporter capture -mute 10001
-  ```
+| Type | Status |
+|---|---|
+| **Antminer** | Working. `IP,MAC` as plain ASCII on udp/14235, sent from udp/14236. |
+| **Whatsminer** | Not yet. Their own tool can do it, so the miners emit something — it needs a capture to find. |
+| **Avalon, SealMiner** | Not yet. Opportunistic. |
 
-Neither one affects the capture files. **Everything received is always written
-to disk in full**, no matter what the screen shows. The end-of-run summary
-labels each port so infrastructure chatter is easy to tell apart from a port
-worth investigating.
+Adding a vendor is a new file in `internal/parse`, not a change to anything
+that already works.
 
-### Can inference from the source IP
-
-The site puts each can on its own address range, with the first octet encoding
-the can name — `1x` for A, `2x` for B, `3x` for O. So `15.4.9.113` is a machine
-in **A5**.
-
-The capture labels every packet with the can its address implies, and groups
-the sources by can in the end-of-run summary:
-
-```
-  Sources grouped by can (inferred from the first octet):
-    A5      15 packets   15.1.1.254, 15.4.9.113, 15.4.9.114, 15.4.9.115
-    B2      12 packets   22.1.1.254
-    ?       12 packets   192.168.1.1
-```
-
-This matters for v1: it means **the can does not have to be typed in**. It
-comes off the wire with every report, which removes a whole category of
-mistake — tagging an entire rack with the wrong can because a field never got
-changed on the walk between them.
-
-It is labelled `can_guess` in the data and always sits next to the raw source
-IP. Anything that does not fit the scheme gets no label rather than a wrong
-one, so this degrades to harmless on a site addressed differently.
-
-### Other notes on reading a capture
-- **A few ports failing to bind is normal.** "address already in use" means
-  another program holds it; "permission denied" means it is below 1024 and
-  needs admin. Everything else still binds, and the failures are listed at the
-  end of the `.txt` file. Only worry if 14235 fails — the tool warns loudly if
-  it does.
-- The capture can run **at the same time as Bitmain's IP Reporter** — it shares
-  port 14235 rather than fighting for it. Running both and pressing a button is
-  the quickest way to confirm it is really working.
+Note that no vendor's report contains a **serial number** — only IP and MAC.
+The serial can only come from the sitemap, which is exactly why position has to
+be recorded during the walk. It cannot be recovered afterwards.
 
 ---
 
@@ -229,22 +214,26 @@ one, so this degrades to harmless on a site addressed differently.
 
 ## Privacy
 
-Captures contain real MAC addresses, IPs and site layout. `.gitignore` is set
-up to keep `captures/`, `exports/`, sitemaps and any `*.csv` out of the repo.
-Only files named `sample-*.csv` are allowed in, and those must be sanitized.
+Captures and exports contain real MAC addresses, IPs and site layout.
+`.gitignore` keeps `captures/`, `exports/`, `sessions/`, sitemaps and any
+`*.csv` out of the repo. Only files named `sample-*.csv` are allowed in, and
+those must be sanitized.
 
 ## Building from source
 
-Requires [Go](https://go.dev/dl/) 1.24+.
+Requires [Go](https://go.dev/dl/) 1.24+. The app additionally needs
+[Wails](https://wails.io/docs/gettingstarted/installation) and a C toolchain,
+because it embeds the system webview.
 
 ```bash
-go build -o ipreporter ./cmd/ipreporter
+go build -o capture-tool ./cmd/ipreporter    # the command-line tool
+cd gui && wails build                        # the app
 ```
 
 Releases are built automatically. Tagging is the only step needed to publish:
 
 ```bash
-git tag v0.1.0 && git push origin v0.1.0
+git tag v1.2.0 && git push origin v1.2.0
 ```
 
 ## License

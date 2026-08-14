@@ -15,8 +15,12 @@ permissions:
   contents: write
 
 jobs:
-  # The command-line tool is pure Go with CGO disabled, so one Linux runner
-  # produces both binaries.
+  # The command-line capture tool. Named "capture-tool" on the Releases page
+  # so it cannot be mistaken for the application: they sat next to each other
+  # as "ipreporter" and "BetterIPReporter" and that was not a distinction
+  # anyone should have to make while standing in a container.
+  #
+  # Pure Go with CGO disabled, so one Linux runner produces both binaries.
   cli:
     runs-on: ubuntu-latest
     steps:
@@ -32,10 +36,10 @@ jobs:
           LDFLAGS="-s -w -X main.version=$GITHUB_REF_NAME"
           CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 \
             go build -trimpath -ldflags "$LDFLAGS" \
-            -o dist/ipreporter-macos-arm64 ./cmd/ipreporter
+            -o dist/capture-tool-macos-arm64 ./cmd/ipreporter
           CGO_ENABLED=0 GOOS=windows GOARCH=amd64 \
             go build -trimpath -ldflags "$LDFLAGS" \
-            -o dist/ipreporter-windows-x64.exe ./cmd/ipreporter
+            -o dist/capture-tool-windows-x64.exe ./cmd/ipreporter
           ls -lh dist/
 
       - uses: actions/upload-artifact@v4
