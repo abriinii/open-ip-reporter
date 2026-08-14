@@ -28,8 +28,11 @@ sessions/
 # would silently swallow gui/frontend/dist, which is the application's UI and
 # has to be committed for the build to embed it.
 /dist/
-build/
-gui/build/
+# Only the compiled output. gui/build also holds the app icon and the platform
+# manifests, which have to be committed or CI builds with Wails' defaults —
+# which is how this shipped with the stock Wails logo for several releases.
+/build/
+gui/build/bin/
 # Leading slash matters: a bare "ipreporter" would also match the
 # cmd/ipreporter source directory and silently drop it from the repo.
 /ipreporter

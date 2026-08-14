@@ -36,14 +36,44 @@ in before suspecting the software.**
 
 Two prompts, both expected:
 
-1. **"Windows protected your PC"** (SmartScreen, because the binary is
-   unsigned). Click **More info**, then **Run anyway**. If there is no "More
-   info" link, right-click the file → **Properties** → tick **Unblock** at the
-   bottom → **OK**, then run it again.
+1. **"Windows protected your PC"** (SmartScreen). Click **More info**, then
+   **Run anyway**. See [Why the warning appears](#why-the-warning-appears) —
+   it is not a virus detection, and there is a way to stop seeing it.
 
 2. **Windows Defender Firewall** asks whether to allow it. **Click Allow, and
    make sure "Private networks" is ticked.** Miss this and the app runs but
    hears nothing. An administrator has to click it.
+
+### Why the warning appears
+
+SmartScreen is not saying the file is malicious. It is saying it has no
+*reputation* — it has not been downloaded enough times for Microsoft to have an
+opinion about it. A tool used by one site will never accumulate that.
+
+Worth knowing before spending money on it: **code signing no longer removes
+this.** EV certificates used to bypass SmartScreen on first download, and
+[Microsoft removed that behaviour in 2024](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/code-signing-options).
+Signed files now build reputation exactly like unsigned ones. Paying for a
+certificate would change the publisher shown in the dialog, not remove it.
+
+What actually works, cheapest first:
+
+- **Copy it from an internal share or a USB stick instead of downloading it in
+  a browser.** The prompt is triggered by the Mark of the Web, a tag browsers
+  attach to downloaded files. Files copied from a file share or removable media
+  usually do not carry it, and no prompt appears. For an internally distributed
+  tool this is the whole fix.
+- **Unblock an already-downloaded copy:** right-click → **Properties** → tick
+  **Unblock** → **OK**. Same effect, one file at a time.
+- **Deploy a certificate to your own machines.** If the fleet is managed with
+  Group Policy or Intune, IT can trust a self-signed certificate across it and
+  the warning stops entirely on those machines. Only worth it for wider rollout.
+- **[SignPath Foundation](https://signpath.io)** offers free code signing to
+  qualifying open-source projects, which this is. It does not grant instant
+  reputation either, but it costs nothing and names a real publisher.
+- **[Azure Artifact Signing](https://azure.microsoft.com/en-us/products/artifact-signing)**
+  at about $9.99/month is the paid option Microsoft now recommends. An OV
+  certificate from a CA runs $150–300/year for the same SmartScreen behaviour.
 
 ### First run on macOS
 
