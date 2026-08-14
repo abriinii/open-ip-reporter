@@ -33,11 +33,24 @@ sessions/
 # which is how this shipped with the stock Wails logo for several releases.
 /build/
 gui/build/bin/
-# Leading slash matters: a bare "ipreporter" would also match the
-# cmd/ipreporter source directory and silently drop it from the repo.
+# Compiled binaries left in the working tree by a local `go build`.
+#
+# Leading slash matters: a bare "capture-tool" would also match the
+# cmd/capture-tool source directory and silently drop it from the repo.
+#
+# The old names stay listed. Renaming the project once left a stale binary
+# from the previous name un-ignored, and the next `git add -A` committed
+# 2.5MB of it. Cheap insurance against doing that again.
+/capture-tool
+/capture-tool.exe
+/capture-tool-*
+/OpenIPReporter
+/OpenIPReporter.exe
+/OpenIPReporter-*
 /ipreporter
 /ipreporter.exe
 /ipreporter-*
+/BetterIPReporter-*
 *.exe
 *.dll
 *.so

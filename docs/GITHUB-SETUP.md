@@ -29,7 +29,7 @@ This stores a token on your machine. You will not be asked again.
 From the project folder:
 
 ```bash
-gh repo create better-ip-reporter --public --source=. --remote=origin --push
+gh repo create open-ip-reporter --public --source=. --remote=origin --push
 ```
 
 That creates the public repo under your account, connects this folder to it,

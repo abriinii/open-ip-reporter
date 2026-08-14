@@ -1,3 +1,3 @@
-module betteripreporter
+module openipreporter
 
 go 1.24

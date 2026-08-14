@@ -10,7 +10,7 @@
 package export
 
 import (
-	"betteripreporter/internal/walk"
+	"openipreporter/internal/walk"
 	"encoding/csv"
 	"fmt"
 	"io"

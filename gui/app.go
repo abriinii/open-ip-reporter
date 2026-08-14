@@ -9,10 +9,10 @@ import (
 	"sync"
 	"time"
 
-	"betteripreporter/internal/capture"
-	"betteripreporter/internal/export"
-	"betteripreporter/internal/parse"
-	"betteripreporter/internal/walk"
+	"openipreporter/internal/capture"
+	"openipreporter/internal/export"
+	"openipreporter/internal/parse"
+	"openipreporter/internal/walk"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )

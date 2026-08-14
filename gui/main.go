@@ -1,7 +1,7 @@
-// Command BetterIPReporter is the desktop application: a window that listens
+// Command OpenIPReporter is the desktop application: a window that listens
 // for miner IP reports and records the physical position of each one.
 //
-// The rules that keep the data correct live in betteripreporter/internal/walk
+// The rules that keep the data correct live in openipreporter/internal/walk
 // and are tested without any UI in the loop. This package is the window around
 // them.
 package main
@@ -23,7 +23,7 @@ func main() {
 	app := NewApp()
 
 	err := wails.Run(&options.App{
-		Title:  "BetterIPReporter",
+		Title:  "OpenIPReporter",
 		Width:  1180,
 		Height: 820,
 		// A rack walk is a lot of rows; below this the table stops being

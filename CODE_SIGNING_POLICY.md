@@ -7,8 +7,8 @@ what the software does with your data.
 
 ## Project
 
-- **Name:** BetterIPReporter
-- **Repository:** https://github.com/abriinii/better-ip-reporter
+- **Name:** OpenIPReporter
+- **Repository:** https://github.com/abriinii/open-ip-reporter
 - **License:** [MIT](LICENSE)
 - **Purpose:** Records the IP and MAC address that Bitcoin mining hardware
   broadcasts when its IP-report button is pressed, together with the physical
@@ -46,7 +46,7 @@ repository above, using the workflow at
   dependencies, which are pinned by `go.mod` and `go.sum`.
 - `SHA256SUMS.txt` is published alongside every release.
 
-Signed binaries carry a consistent product name (`BetterIPReporter`) and a
+Signed binaries carry a consistent product name (`OpenIPReporter`) and a
 version string set from the release tag.
 
 ## Third-party components
@@ -85,7 +85,7 @@ CSV files you exported.
 ## Reporting a problem
 
 Security or integrity concerns:
-[open an issue](https://github.com/abriinii/better-ip-reporter/issues).
+[open an issue](https://github.com/abriinii/open-ip-reporter/issues).
 
 ---
 

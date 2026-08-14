@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"betteripreporter/internal/capture"
-	"betteripreporter/internal/export"
+	"openipreporter/internal/capture"
+	"openipreporter/internal/export"
 )
 
 func newTestApp(t *testing.T) *App {

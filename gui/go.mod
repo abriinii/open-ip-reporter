@@ -1,10 +1,10 @@
-module betteripreporter/gui
+module openipreporter/gui
 
 go 1.25.0
 
 require (
-	betteripreporter v0.0.0
 	github.com/wailsapp/wails/v2 v2.14.0
+	openipreporter v0.0.0
 )
 
 require (
@@ -38,4 +38,4 @@ require (
 	golang.org/x/text v0.39.0 // indirect
 )
 
-replace betteripreporter => ../
+replace openipreporter => ../

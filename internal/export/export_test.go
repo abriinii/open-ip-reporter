@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"betteripreporter/internal/walk"
+	"openipreporter/internal/walk"
 )
 
 var b1 = walk.Geometry{Rows: 10, Columns: 5}

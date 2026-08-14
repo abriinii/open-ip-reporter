@@ -1,4 +1,4 @@
-# BetterIPReporter
+# OpenIPReporter
 
 An open-source replacement for Bitmain's IP Reporter, for building
 **serial → MAC → physical position** maps during a rack walk.
@@ -17,7 +17,7 @@ programs there — you almost certainly want the first one.
 
 | Download this | If you want |
 |---|---|
-| **`BetterIPReporter-windows-x64.exe`**<br>**`BetterIPReporter-macos-arm64.zip`** | **The app.** A window you walk a rack with. This is the one. |
+| **`OpenIPReporter-windows-x64.exe`**<br>**`OpenIPReporter-macos-arm64.zip`** | **The app.** A window you walk a rack with. This is the one. |
 | `capture-tool-windows-x64.exe`<br>`capture-tool-macos-arm64` | A command-line tool for recording raw miner broadcasts. Only needed when a miner type is not recognised yet and its wire format has to be worked out. |
 
 Nothing to install either way. One file, download and run.
@@ -274,7 +274,7 @@ Requires [Go](https://go.dev/dl/) 1.24+. The app additionally needs
 because it embeds the system webview.
 
 ```bash
-go build -o capture-tool ./cmd/ipreporter    # the command-line tool
+go build -o capture-tool ./cmd/capture-tool    # the command-line tool
 cd gui && wails build                        # the app
 ```
 

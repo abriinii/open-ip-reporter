@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"betteripreporter/internal/capture"
-	"betteripreporter/internal/export"
-	"betteripreporter/internal/parse"
+	"openipreporter/internal/capture"
+	"openipreporter/internal/export"
+	"openipreporter/internal/parse"
 )
 
 // TestRealSocketToCSV drives the whole chain the way a walk does: a real UDP

@@ -15,10 +15,9 @@ permissions:
   contents: write
 
 jobs:
-  # The command-line capture tool. Named "capture-tool" on the Releases page
-  # so it cannot be mistaken for the application: they sat next to each other
-  # as "ipreporter" and "BetterIPReporter" and that was not a distinction
-  # anyone should have to make while standing in a container.
+  # The command-line capture tool, published as "capture-tool" so it cannot be
+  # mistaken for the application next to it on the Releases page. That is not a
+  # distinction anyone should have to make while standing in a container.
   #
   # Pure Go with CGO disabled, so one Linux runner produces both binaries.
   cli:
@@ -36,10 +35,10 @@ jobs:
           LDFLAGS="-s -w -X main.version=$GITHUB_REF_NAME"
           CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 \
             go build -trimpath -ldflags "$LDFLAGS" \
-            -o dist/capture-tool-macos-arm64 ./cmd/ipreporter
+            -o dist/capture-tool-macos-arm64 ./cmd/capture-tool
           CGO_ENABLED=0 GOOS=windows GOARCH=amd64 \
             go build -trimpath -ldflags "$LDFLAGS" \
-            -o dist/capture-tool-windows-x64.exe ./cmd/ipreporter
+            -o dist/capture-tool-windows-x64.exe ./cmd/capture-tool
           ls -lh dist/
 
       - uses: actions/upload-artifact@v4
@@ -60,12 +59,12 @@ jobs:
             # serves a single file that survives the download intact.
             package: |
               cd gui/build/bin
-              ditto -c -k --keepParent BetterIPReporter.app ../../../dist/BetterIPReporter-macos-arm64.zip
+              ditto -c -k --keepParent OpenIPReporter.app ../../../dist/OpenIPReporter-macos-arm64.zip
           - os: windows-latest
             platform: windows/amd64
             package: |
               mkdir -p dist
-              cp gui/build/bin/BetterIPReporter.exe dist/BetterIPReporter-windows-x64.exe
+              cp gui/build/bin/OpenIPReporter.exe dist/OpenIPReporter-windows-x64.exe
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4

@@ -1,9 +1,9 @@
-// Package capture implements Phase 0: a raw UDP listener that records every
-// packet it can hear, with no assumptions about payload format.
+// Package capture is a raw UDP listener that records every packet it can hear,
+// with no assumptions about payload format.
 //
 // The point is to learn the wire formats from real miners rather than guessing
-// them. Nothing in here parses a payload. Parsing lands in a separate package
-// once we have captures from each miner type on site.
+// them. Nothing in here parses a payload; that lives in the parse package, so
+// a new miner type is a new file there rather than a change in here.
 package capture
 
 import (
@@ -208,7 +208,7 @@ func Run(opts Options, stop <-chan struct{}) error {
 	fmt.Printf("\n  Capture files written:\n    %s\n    %s\n\n", jsonlPath, textPath)
 	if total == 0 {
 		fmt.Println("  No packets captured. If you pressed a miner button and saw nothing,")
-		fmt.Println("  run `ipreporter sniff` for the fallback that can see every port.")
+		fmt.Println("  run `capture-tool sniff` for the fallback that can see every port.")
 	} else {
 		fmt.Println("  Send both files back and I'll build the parser from them.")
 	}
@@ -388,7 +388,7 @@ func formatSummary(total, hidden int, counts map[int]int, sources map[string]int
 // text log. If a capture comes back empty, this is usually what explains it —
 // wrong interface, wrong subnet, or VPN routing the traffic away.
 func writeEnvironment(w io.Writer, ports []int) {
-	fmt.Fprintf(w, "BetterIPReporter capture\n")
+	fmt.Fprintf(w, "OpenIPReporter capture\n")
 	fmt.Fprintf(w, "started: %s\n", time.Now().Format(time.RFC3339))
 	fmt.Fprintf(w, "host os: %s/%s\n", runtime.GOOS, runtime.GOARCH)
 	fmt.Fprintf(w, "ports requested: %d\n\n", len(ports))

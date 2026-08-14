@@ -1,8 +1,9 @@
-// Command ipreporter is an open-source replacement for Bitmain's IP Reporter.
+// Command capture-tool records the raw UDP that miners broadcast, for working
+// out the wire format of a machine type OpenIPReporter cannot decode yet.
 //
-// Phase 0 (what exists today) is capture only: it records the raw UDP that
-// miners broadcast when you press their IP-report button, so the parsers for
-// v1 can be written against real traffic instead of assumed formats.
+// It is the companion to the application, not a replacement for it: the app is
+// what you walk a rack with. This exists so that a new miner type can be
+// supported from real traffic rather than an assumed format.
 package main
 
 import (
@@ -15,8 +16,8 @@ import (
 	"strings"
 	"syscall"
 
-	"betteripreporter/internal/capture"
-	"betteripreporter/internal/parse"
+	"openipreporter/internal/capture"
+	"openipreporter/internal/parse"
 )
 
 // version is set at build time by the release workflow, so it always matches
@@ -26,7 +27,7 @@ var version = "dev"
 func main() {
 	cmd := "capture"
 	args := os.Args[1:]
-	// Bare `ipreporter` (or a double-click on Windows) runs a capture, which
+	// Bare `capture-tool` (or a double-click on Windows) runs a capture, which
 	// is the only thing this build does. A leading non-flag word selects a
 	// subcommand instead.
 	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
@@ -43,7 +44,7 @@ func main() {
 	case "sniff":
 		runSniff()
 	case "version":
-		fmt.Println("ipreporter " + version)
+		fmt.Println("capture-tool " + version)
 	case "help":
 		usage()
 	default:
@@ -54,14 +55,14 @@ func main() {
 }
 
 func usage() {
-	fmt.Print(`ipreporter ` + version + `
+	fmt.Print(`capture-tool ` + version + `
 
-  ipreporter                 record miner broadcasts (same as "capture")
-  ipreporter capture         record miner broadcasts
-  ipreporter parse FILE      decode a capture into miner reports
-  ipreporter ports           list the UDP ports capture will listen on
-  ipreporter sniff           show the fallback for finding an unknown port
-  ipreporter version         print version
+  capture-tool                 record miner broadcasts (same as "capture")
+  capture-tool capture         record miner broadcasts
+  capture-tool parse FILE      decode a capture into miner reports
+  capture-tool ports           list the UDP ports capture will listen on
+  capture-tool sniff           show the fallback for finding an unknown port
+  capture-tool version         print version
 
 capture flags:
   -out DIR        where to write capture files       (default "captures")
@@ -112,7 +113,7 @@ func runCapture(args []string) int {
 	}
 
 	fmt.Println()
-	fmt.Println("  BetterIPReporter — capture mode (Phase 0)")
+	fmt.Println("  OpenIPReporter — capture tool")
 	fmt.Println()
 
 	stop := make(chan struct{})
@@ -141,7 +142,7 @@ func runParse(args []string) int {
 	fs := flag.NewFlagSet("parse", flag.ExitOnError)
 	fs.Parse(args)
 	if fs.NArg() != 1 {
-		fmt.Fprintln(os.Stderr, "usage: ipreporter parse captures/capture-....jsonl")
+		fmt.Fprintln(os.Stderr, "usage: capture-tool parse captures/capture-....jsonl")
 		return 2
 	}
 
@@ -208,7 +209,7 @@ func runPorts() {
 			fmt.Println()
 		}
 	}
-	fmt.Printf("\n\n  Add more with:  ipreporter capture -add 12345,20000-20100\n\n")
+	fmt.Printf("\n\n  Add more with:  capture-tool capture -add 12345,20000-20100\n\n")
 }
 
 // runSniff prints the escape hatch. Binding ports can only hear ports we
@@ -218,7 +219,7 @@ func runSniff() {
 	fmt.Println(`
   FINDING A PORT THE CAPTURE CANNOT SEE
 
-  "ipreporter capture" works by binding UDP ports, so it can only hear the
+  "capture-tool capture" works by binding UDP ports, so it can only hear the
   ports it was told to listen on. If you press a miner's button and nothing
   appears, the miner is using a port that is not in the list yet.
 
@@ -256,7 +257,7 @@ func runSniff() {
   Once we know the port, it goes into the default list and the plain capture
   picks it up from then on. You can also listen for it immediately:
 
-      ipreporter capture -add PORT
+      capture-tool capture -add PORT
 
 `)
 }
