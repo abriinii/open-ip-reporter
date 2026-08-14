@@ -68,9 +68,11 @@ What actually works, cheapest first:
 - **Deploy a certificate to your own machines.** If the fleet is managed with
   Group Policy or Intune, IT can trust a self-signed certificate across it and
   the warning stops entirely on those machines. Only worth it for wider rollout.
-- **[SignPath Foundation](https://signpath.io)** offers free code signing to
+- **[SignPath Foundation](https://signpath.org)** offers free code signing to
   qualifying open-source projects, which this is. It does not grant instant
-  reputation either, but it costs nothing and names a real publisher.
+  reputation either, but it costs nothing and names a real publisher. See
+  [CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md), which their terms require
+  a project to publish before applying.
 - **[Azure Artifact Signing](https://azure.microsoft.com/en-us/products/artifact-signing)**
   at about $9.99/month is the paid option Microsoft now recommends. An OV
   certificate from a CA runs $150–300/year for the same SmartScreen behaviour.
