@@ -1,0 +1,51 @@
+# ---------------------------------------------------------------------------
+# Site data. NEVER COMMIT ANY OF THIS.
+# Captures, exports and sitemaps contain real MAC addresses, serial numbers and
+# the physical layout of the site. Sanitized samples are the only exception,
+# and they must be named sample-*.
+# ---------------------------------------------------------------------------
+captures/
+exports/
+sitemaps/
+*.jsonl
+*.pcap
+*.pcapng
+
+*.csv
+*.tsv
+*.xlsx
+!**/sample-*.csv
+!**/sample-*.tsv
+
+# Session state written during a walk
+sessions/
+*.session.json
+
+# ---------------------------------------------------------------------------
+# Build output
+# ---------------------------------------------------------------------------
+dist/
+build/
+# Leading slash matters: a bare "ipreporter" would also match the
+# cmd/ipreporter source directory and silently drop it from the repo.
+/ipreporter
+/ipreporter.exe
+/ipreporter-*
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Go
+*.test
+*.out
+vendor/
+
+# ---------------------------------------------------------------------------
+# Editors / OS
+# ---------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

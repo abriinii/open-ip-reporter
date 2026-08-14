@@ -1,0 +1,31 @@
+name: CI
+
+# Catches a broken build before it reaches a release tag.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test ./...
+
+      # Both release targets must compile on every push, so a platform-specific
+      # mistake (the Windows socket options especially) surfaces immediately.
+      - name: Build macOS arm64
+        run: CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build ./...
+
+      - name: Build Windows x64
+        run: CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build ./...
