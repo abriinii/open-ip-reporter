@@ -20,6 +20,12 @@ var canLetters = map[int]string{
 	3: "O",
 }
 
+// notACan covers ranges that fit the addressing scheme but are not a can you
+// can walk. Labelling them is better than letting them masquerade as one.
+var notACan = map[string]string{
+	"O4": "testbench", // 34.x is the testbench, not a fourth outdoor can
+}
+
 // DeriveCan returns the can name implied by an IP's first octet, or "" when the
 // address does not fit the scheme.
 func DeriveCan(ip string) string {
@@ -40,7 +46,11 @@ func DeriveCan(ip string) string {
 	if number == 0 {
 		return "" // x0 is not a can in this scheme
 	}
-	return fmt.Sprintf("%s%d", letter, number)
+	name := fmt.Sprintf("%s%d", letter, number)
+	if label, special := notACan[name]; special {
+		return label
+	}
+	return name
 }
 
 // formatCanTable groups the sources seen during a run by the can their address

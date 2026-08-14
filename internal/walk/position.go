@@ -40,7 +40,6 @@ var geometryByCan = map[string]Geometry{
 	"O1": {Rows: 8, Columns: 6},
 	"O2": {Rows: 8, Columns: 6},
 	"O3": {Rows: 8, Columns: 6},
-	"O4": {Rows: 8, Columns: 6}, // seen on the network; confirm before trusting
 }
 
 // DefaultGeometry returns the known shape for a can. The second result is false

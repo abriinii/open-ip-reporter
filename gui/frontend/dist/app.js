@@ -18,28 +18,31 @@ function render(s) {
 
   const btn = $("startstop");
   btn.classList.toggle("running", s.active);
-  btn.innerHTML = s.active ? 'Stop' : 'Start <span class="glyph">&#9655;</span>';
+  btn.innerHTML = s.active ? "Stop" : 'Start <span class="glyph">&#9655;</span>';
 
   // Never fight the operator for a box they are typing in.
-  if (document.activeElement !== $("column")) $("column").value = s.nextColumn || 1;
   if (document.activeElement !== $("row")) $("row").value = s.nextRow || 1;
+  if (document.activeElement !== $("column")) $("column").value = s.nextColumn || 1;
   if (s.active) {
     if (document.activeElement !== $("rack")) $("rack").value = s.rack;
     $("can").value = s.can;
   }
   $("can").disabled = s.active;
   $("rack").disabled = s.active;
+  $("row").disabled = !s.active;
+  $("column").disabled = !s.active;
 
-  $("head-note").textContent = s.active
-    ? `${s.can} · rack ${s.rack} · ${s.entries.length} of ${s.positions} positions`
-    : "";
+  $("undo").disabled = !s.canUndo;
+  $("redo").disabled = !s.canRedo;
+  $("export").disabled = !s.active || s.entries.length === 0;
 
   $("status-text").textContent =
-    `${s.recorded} Device${s.recorded === 1 ? "" : "s"} Connected`;
+    `${s.recorded} Device${s.recorded === 1 ? "" : "s"} Connected` +
+    (s.active ? `  ·  ${s.can} rack ${s.rack}  ·  ${s.entries.length} of ${s.positions} positions` : "");
 
   if (s.error) hint(s.error, true);
   else if (!s.listening) hint("not listening — no ports could be opened", true);
-  else if (s.full) hint("rack complete");
+  else if (s.exported) hint(`exported ${s.exported}`);
 
   renderRows(s);
 }
@@ -49,7 +52,6 @@ function renderRows(s) {
   const grew = s.entries.length > lastCount;
   lastCount = s.entries.length;
 
-  $("empty").classList.toggle("hidden", s.entries.length > 0);
   $("empty").style.display = s.entries.length > 0 ? "none" : "";
   body.innerHTML = "";
 
@@ -58,12 +60,18 @@ function renderRows(s) {
     tr.className = (i === selected ? "sel " : "") +
                    (grew && i === s.entries.length - 1 ? "fresh" : "");
     tr.onclick = () => { selected = i; renderRows(state); };
+    tr.oncontextmenu = (ev) => {
+      ev.preventDefault();
+      selected = i;
+      renderRows(state);
+      openMenu($("ctx"), ev.clientX, ev.clientY);
+    };
 
-    tr.innerHTML = e.kind === "skipped"
-      ? `<td class="no">${i + 1}</td><td class="pos">${e.label}</td>` +
-        `<td class="skip" colspan="2">skipped</td>`
-      : `<td class="no">${i + 1}</td><td class="pos">${e.label}</td>` +
-        `<td class="mono">${esc(e.ip)}</td><td class="mono">${esc(e.mac)}</td>`;
+    tr.innerHTML =
+      `<td class="no">${i + 1}</td><td class="pos">${e.row}</td><td class="pos">${e.column}</td>` +
+      (e.kind === "skipped"
+        ? `<td class="skip" colspan="2">skipped</td>`
+        : `<td class="mono">${esc(e.ip)}</td><td class="mono">${esc(e.mac)}</td>`);
     body.appendChild(tr);
   });
 
@@ -85,6 +93,64 @@ function esc(s) {
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
+// ---------- menus ----------
+
+function openMenu(menu, x, y) {
+  closeMenus();
+  menu.classList.remove("hidden");
+  const r = menu.getBoundingClientRect();
+  menu.style.left = Math.min(x, innerWidth - r.width - 8) + "px";
+  menu.style.top = Math.min(y, innerHeight - r.height - 8) + "px";
+
+  // Arm the dismiss listener on the next tick. Opening a menu is itself a
+  // mouse event, and a right-click is followed by a synthetic click in some
+  // environments — arming immediately would close the menu before it is seen.
+  setTimeout(() => document.addEventListener("mousedown", dismiss), 0);
+}
+
+function dismiss(ev) {
+  if (ev && ev.target.closest(".menu")) return; // let the item handle itself
+  closeMenus();
+}
+
+function closeMenus() {
+  document.removeEventListener("mousedown", dismiss);
+  $("ctx").classList.add("hidden");
+  $("exportmenu").classList.add("hidden");
+}
+
+document.addEventListener("keydown", (ev) => {
+  if (ev.key === "Escape") closeMenus();
+});
+
+$("ctx").onclick = async (ev) => {
+  const act = ev.target.closest("button")?.dataset.act;
+  if (!act || selected < 0) return;
+  closeMenus();
+  switch (act) {
+    case "mac": await editMAC(selected); break;
+    case "pos": await editRowPosition(selected); break;
+    case "insert": render(await go().InsertBlankAbove(selected)); break;
+    case "delete": await deleteRow(); break;
+  }
+};
+
+$("export").onclick = (ev) => {
+  ev.stopPropagation();
+  if ($("export").disabled) return;
+  const r = $("export").getBoundingClientRect();
+  openMenu($("exportmenu"), r.left, r.bottom + 4);
+};
+$("exportmenu").onclick = async (ev) => {
+  const fmt = ev.target.closest("button")?.dataset.fmt;
+  if (!fmt) return;
+  closeMenus();
+  render(await go().Export(fmt));
+};
+
+$("undo").onclick = async () => render(await go().Undo());
+$("redo").onclick = async () => render(await go().Redo());
+
 // ---------- position boxes ----------
 //
 // These are the display and the control at once: they show where the next
@@ -93,19 +159,19 @@ function esc(s) {
 
 async function commitPosition() {
   if (!state?.active) return;
-  const col = parseInt($("column").value, 10);
   const row = parseInt($("row").value, 10);
-  if (!Number.isFinite(col) || !Number.isFinite(row)) return;
-  if (col === state.nextColumn && row === state.nextRow) return;
+  const col = parseInt($("column").value, 10);
+  if (!Number.isFinite(row) || !Number.isFinite(col)) return;
+  if (row === state.nextRow && col === state.nextColumn) return;
 
   const s = await go().SetNextPosition(col, row);
-  const rejected = !!s.error;
-  $("column").classList.toggle("bad", rejected);
-  $("row").classList.toggle("bad", rejected);
+  const bad = !!s.error;
+  $("row").classList.toggle("bad", bad);
+  $("column").classList.toggle("bad", bad);
   render(s);
 }
 
-for (const id of ["column", "row"]) {
+for (const id of ["row", "column"]) {
   $(id).addEventListener("focus", () => { editing = true; });
   $(id).addEventListener("blur", () => { editing = false; commitPosition(); });
   $(id).addEventListener("keydown", (ev) => {
@@ -146,12 +212,7 @@ document.addEventListener("keydown", async (ev) => {
 
     case "Delete":
     case "Backspace":
-      if (selected >= 0) {
-        ev.preventDefault();
-        render(await go().Delete(selected));
-        selected = Math.min(selected, (state?.entries?.length ?? 1) - 1);
-        renderRows(state);
-      }
+      if (selected >= 0) { ev.preventDefault(); await deleteRow(); }
       break;
 
     case "Enter":
@@ -162,6 +223,10 @@ document.addEventListener("keydown", async (ev) => {
       if (selected >= 0) { ev.preventDefault(); render(await go().InsertBlankAbove(selected)); }
       break;
 
+    case "p": case "P":
+      if (selected >= 0) { ev.preventDefault(); await editRowPosition(selected); }
+      break;
+
     case "z": case "Z":
       if (ev.ctrlKey || ev.metaKey) { ev.preventDefault(); render(await go().Undo()); }
       break;
@@ -169,8 +234,18 @@ document.addEventListener("keydown", async (ev) => {
     case "y": case "Y":
       if (ev.ctrlKey || ev.metaKey) { ev.preventDefault(); render(await go().Redo()); }
       break;
+
+    case "e": case "E":
+      if (ev.ctrlKey || ev.metaKey) { ev.preventDefault(); render(await go().Export("positional")); }
+      break;
   }
 });
+
+async function deleteRow() {
+  render(await go().Delete(selected));
+  selected = Math.min(selected, (state?.entries?.length ?? 1) - 1);
+  renderRows(state);
+}
 
 async function editMAC(i) {
   editing = true;
@@ -179,6 +254,23 @@ async function editMAC(i) {
     const val = window.prompt("MAC address for this position (empty = skipped):", cur);
     if (val === null) return;
     render(await go().SetMAC(i, val.trim()));
+  } finally { editing = false; }
+}
+
+// Repositioning one recorded row, as opposed to moving the walk. Everything
+// below it renumbers to follow.
+async function editRowPosition(i) {
+  editing = true;
+  try {
+    const e = state.entries[i];
+    const val = window.prompt(
+      `Position for row ${i + 1}, as row/column. Rows below renumber to follow.\n` +
+      `This rack is ${state.rows} rows by ${state.columns} columns.`,
+      `${e.row}/${e.column}`);
+    if (val === null) return;
+    const m = val.match(/^\s*(\d+)\s*[\/,\s]\s*(\d+)\s*$/);
+    if (!m) { hint(`"${val}" is not a row/column, e.g. 7/2`, true); return; }
+    render(await go().SetPosition(i, parseInt(m[2], 10), parseInt(m[1], 10)));
   } finally { editing = false; }
 }
 
@@ -202,9 +294,9 @@ async function boot() {
     const s = await go().StartSession(sel.value, rack);
     render(s);
     if (!s.error) {
-      const col = parseInt($("column").value, 10);
       const row = parseInt($("row").value, 10);
-      if (col > 1 || row > 1) render(await go().SetNextPosition(col, row));
+      const col = parseInt($("column").value, 10);
+      if (row > 1 || col > 1) render(await go().SetNextPosition(col, row));
     }
   };
 

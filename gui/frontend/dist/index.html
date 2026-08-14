@@ -22,12 +22,12 @@
       <input id="rack" type="number" min="1" max="20" value="1">
     </div>
     <div class="field narrow">
-      <label for="column">Column</label>
-      <input id="column" type="number" min="1" value="1">
-    </div>
-    <div class="field narrow">
       <label for="row">Row</label>
       <input id="row" type="number" min="1" value="1">
+    </div>
+    <div class="field narrow">
+      <label for="column">Column</label>
+      <input id="column" type="number" min="1" value="1">
     </div>
     <button id="startstop" class="start">Start <span class="glyph">&#9655;</span></button>
   </section>
@@ -39,7 +39,13 @@
         <path d="M2 9h14M9 2c4 4 4 10 0 14M9 2C5 6 5 12 9 16"/>
       </svg>
       <h2>Device Information</h2>
-      <span class="head-right" id="head-note"></span>
+
+      <div class="tools">
+        <button id="undo" class="tool" title="Undo (Ctrl+Z)">Undo</button>
+        <button id="redo" class="tool" title="Redo (Ctrl+Y)">Redo</button>
+        <span class="tool-sep"></span>
+        <button id="export" class="tool">Export <span class="caret">&#9662;</span></button>
+      </div>
     </header>
 
     <div class="table-scroll">
@@ -47,7 +53,8 @@
         <thead>
           <tr>
             <th class="c-no">No.</th>
-            <th class="c-pos">Position</th>
+            <th class="c-rc">Row</th>
+            <th class="c-rc">Column</th>
             <th class="c-ip">IP Address</th>
             <th>MAC Address</th>
           </tr>
@@ -62,8 +69,21 @@
       <span id="status-hint" class="status-hint"></span>
     </footer>
   </section>
-
 </main>
+
+<!-- Right-click a row. Everything here is also on a key. -->
+<div id="ctx" class="menu hidden">
+  <button data-act="mac">Edit MAC address…</button>
+  <button data-act="pos">Set position…</button>
+  <div class="menu-sep"></div>
+  <button data-act="insert">Insert blank above</button>
+  <button data-act="delete">Delete row</button>
+</div>
+
+<div id="exportmenu" class="menu hidden">
+  <button data-fmt="positional">Positional CSV <small>same as the current process</small></button>
+  <button data-fmt="tagged">Position-tagged CSV <small>can / rack / row / column per MAC</small></button>
+</div>
 
 <script src="/wails/runtime.js"></script>
 <script src="app.js"></script>

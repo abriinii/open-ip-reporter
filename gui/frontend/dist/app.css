@@ -137,7 +137,7 @@ thead th {
   white-space: nowrap;
 }
 .c-no  { width: 62px; }
-.c-pos { width: 108px; }
+.c-rc  { width: 74px; }
 .c-ip  { width: 190px; }
 
 tbody tr { cursor: default; }
@@ -176,3 +176,52 @@ td.skip { color: var(--skip); font-style: italic; }
 @media (prefers-color-scheme: dark) {
   ::-webkit-scrollbar-thumb { background: #555; }
 }
+
+/* ---------- toolbar ---------- */
+
+.tools { margin-left: auto; display: flex; align-items: center; gap: 4px; }
+.tool {
+  height: 28px;
+  padding: 0 10px;
+  background: transparent;
+  color: var(--text);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font: 13px var(--ui);
+  cursor: pointer;
+  display: flex; align-items: center; gap: 5px;
+}
+.tool:hover:not(:disabled) { background: var(--row-hover); border-color: var(--line); }
+.tool:disabled { color: var(--text-3); cursor: default; }
+.tool-sep { width: 1px; height: 17px; background: var(--line); margin: 0 4px; }
+.caret { font-size: 10px; color: var(--text-2); }
+
+/* ---------- menus ---------- */
+
+.menu {
+  position: fixed;
+  z-index: 50;
+  min-width: 200px;
+  padding: 4px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  box-shadow: 0 8px 20px rgba(0,0,0,.16);
+}
+.menu.hidden { display: none; }
+.menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 7px 10px;
+  background: transparent;
+  color: var(--text);
+  border: 0;
+  border-radius: 4px;
+  font: 13px var(--ui);
+  cursor: pointer;
+}
+.menu button:hover:not(:disabled) { background: var(--row-hover); }
+.menu button:disabled { color: var(--text-3); cursor: default; }
+.menu button small { display: block; color: var(--text-3); font-size: 11px; margin-top: 1px; }
+.menu-sep { height: 1px; background: var(--line); margin: 4px 2px; }

@@ -21,7 +21,7 @@ func TestDeriveCan(t *testing.T) {
 		"31.1.1.254": "O1",
 		"32.1.1.254": "O2",
 		"33.1.1.254": "O3",
-		"34.1.1.254": "O4",
+		"34.1.1.254": "testbench", // not a can: the testbench
 		"15.4.9.113": "A5", // a miner, not just the switch
 	}
 	for ip, want := range tests {

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"betteripreporter/internal/capture"
+	"betteripreporter/internal/export"
 	"betteripreporter/internal/parse"
 	"betteripreporter/internal/walk"
 
@@ -34,6 +35,7 @@ type App struct {
 
 	listening  bool
 	boundPorts int
+	exported   string // filename of the most recent export, for the status bar
 	stopListen chan struct{}
 
 	sessionDir string
@@ -158,7 +160,7 @@ func (a *App) emit(event string, data ...any) {
 
 // Cans lists the cans that can be walked, in floor order.
 func (a *App) Cans() []string {
-	cans := []string{"A1", "A2", "A5", "A6", "A7", "A8", "B1", "B2", "B3", "B4", "O1", "O2", "O3", "O4"}
+	cans := []string{"A1", "A2", "A5", "A6", "A7", "A8", "B1", "B2", "B3", "B4", "O1", "O2", "O3"}
 	sort.SliceStable(cans, func(i, j int) bool {
 		if cans[i][0] != cans[j][0] {
 			return cans[i][0] < cans[j][0]
@@ -281,6 +283,44 @@ func (a *App) mutate(f func(*walk.Session) error) State {
 	return a.stateLocked("")
 }
 
+// Export writes the walk to a CSV the operator picks a location for.
+//
+// "positional" is the default and matches what the existing process consumes.
+// "tagged" carries can/rack/row/column on every row.
+func (a *App) Export(format string) State {
+	a.mu.Lock()
+	s := a.session
+	a.mu.Unlock()
+
+	if s == nil {
+		return a.State()
+	}
+
+	name, writer := export.PositionalName(s), export.Positional
+	title := "Export positional CSV"
+	if format == "tagged" {
+		name, writer = export.TaggedName(s), export.Tagged
+		title = "Export position-tagged CSV"
+	}
+
+	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		Title:           title,
+		DefaultFilename: name,
+		Filters:         []runtime.FileFilter{{DisplayName: "CSV (*.csv)", Pattern: "*.csv"}},
+	})
+	if err != nil || path == "" {
+		return a.State() // cancelled
+	}
+
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if err := export.WriteFile(path, a.session, writer); err != nil {
+		return a.stateLocked(err.Error())
+	}
+	a.exported = filepath.Base(path)
+	return a.stateLocked("")
+}
+
 // State returns everything the window needs to draw itself.
 func (a *App) State() State {
 	a.mu.Lock()
@@ -313,6 +353,7 @@ type State struct {
 	NextColumn int    `json:"nextColumn"`
 	NextRow    int    `json:"nextRow"`
 	Recorded   int    `json:"recorded"`
+	Exported   string `json:"exported"`
 	Full       bool   `json:"full"`
 	CanUndo    bool   `json:"canUndo"`
 	CanRedo    bool   `json:"canRedo"`
@@ -325,6 +366,7 @@ func (a *App) stateLocked(errMsg string) State {
 	st := State{
 		Listening:  a.listening,
 		BoundPorts: a.boundPorts,
+		Exported:   a.exported,
 		Error:      errMsg,
 	}
 	if a.session == nil {
