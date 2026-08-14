@@ -79,7 +79,6 @@ func NewApp() *App {
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	a.loadLayout()
-	go a.checkForUpdate()
 	a.startListening()
 }
 
@@ -307,23 +306,46 @@ func (a *App) SetCheckForUpdates(on bool) {
 	a.saveSettings(s)
 }
 
-// checkForUpdate asks GitHub whether a newer release exists.
+// CheckForUpdate asks GitHub whether a newer release exists and reports what
+// happened, so the window can show that it is checking rather than doing it
+// invisibly.
 //
-// Runs in the background and never blocks the window opening. Failure is
-// expected and silent: the machine walking a rack is on the miner network,
-// which usually has no route to the internet at all.
+// Called by the frontend once its event handlers are registered. Doing it from
+// startup instead would race: a fast reply arrives before anything is
+// listening and the result is simply lost.
+func (a *App) CheckForUpdate() {
+	go a.checkForUpdate()
+}
+
 func (a *App) checkForUpdate() {
 	if on := a.loadSettings().CheckForUpdates; on == nil || !*on {
+		a.emit("update-status", map[string]any{"state": "off"})
 		return
 	}
+	if a.version == "" || a.version == "dev" {
+		a.emit("update-status", map[string]any{"state": "dev"})
+		return
+	}
+
+	a.emit("update-status", map[string]any{"state": "checking"})
+
 	rel, err := update.NewChecker(a.updateRepo).Check(context.Background(), a.version)
-	if err != nil || rel == nil {
-		return
+	switch {
+	case err != nil:
+		// Being unreachable is the normal case on a miner network, so this is
+		// reported plainly rather than as a fault.
+		a.emit("update-status", map[string]any{"state": "unreachable"})
+	case rel == nil:
+		a.emit("update-status", map[string]any{"state": "current"})
+	default:
+		a.mu.Lock()
+		a.latest = rel
+		a.mu.Unlock()
+		a.emit("update-status", map[string]any{
+			"state": "available", "version": rel.Version,
+			"notes": rel.Notes, "url": rel.URL,
+		})
 	}
-	a.mu.Lock()
-	a.latest = rel
-	a.mu.Unlock()
-	a.emit("update-available", rel)
 }
 
 // OpenReleasePage sends the operator to the download page in their browser.

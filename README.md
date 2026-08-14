@@ -279,9 +279,18 @@ be recorded during the walk. It cannot be recovered afterwards.
 
 ## Update notice
 
-On startup the app asks GitHub whether a newer release exists, and shows the
-release notes if so. It never downloads or installs anything — the button opens
-the download page in your browser.
+On startup the app asks GitHub whether a newer release exists. A small notice
+appears in the corner while it checks, and the running version sits in the
+bottom-right of the status bar with the result next to it:
+
+```
+v2.3.0 · up to date        checked and current
+v2.3.0 · offline           no route to the internet, which is normal in a can
+v2.3.0 · v2.4.0 available  click it to see the release notes again
+```
+
+If a newer version exists you get its release notes. It never downloads or
+installs anything — the button opens the download page in your browser.
 
 Turn it off with the checkbox on that notice. Off, the app makes no outbound
 network requests at all. It also stays quiet when there is no route to the

@@ -65,6 +65,7 @@ function render(s) {
   else if (!s.listening) hint("not listening — no ports could be opened", true);
   else if (s.exported) hint(`exported ${s.exported}`);
 
+  setVersionLine();
   renderRows(s);
 }
 
@@ -414,6 +415,90 @@ async function refreshCans() {
   if (cans.includes(previous)) sel.value = previous;
 }
 
+// ---------- launch update check ----------
+//
+// The check itself takes a fraction of a second on a good connection, which
+// would flash past unread. It is held on screen for a moment so that "we
+// looked, and here is the answer" is something the operator actually sees.
+
+const TOAST_MIN_MS = 1100;
+let checkStarted = 0;
+let updateState = { state: "" };
+
+function setVersionLine() {
+  const v = state?.version && state.version !== "dev" ? state.version : "dev build";
+  const el = $("version-line");
+  switch (updateState.state) {
+    case "checking":
+      el.innerHTML = `${esc(v)} · checking…`;
+      break;
+    case "current":
+      el.innerHTML = `${esc(v)} · <span class="ok">up to date</span>`;
+      break;
+    case "available":
+      el.innerHTML = `${esc(v)} · <span class="stale" id="version-update">${esc(updateState.version)} available</span>`;
+      $("version-update").onclick = () => showUpdate(updateState);
+      break;
+    case "unreachable":
+      el.innerHTML = `${esc(v)} · offline`;
+      break;
+    default:
+      el.textContent = v;
+  }
+}
+
+function toast(text, kind, holdMs) {
+  const el = $("toast");
+  $("toast-text").textContent = text;
+  $("toast-spin").className = "spin" + (kind ? " " + kind : "");
+  el.classList.remove("hidden", "out");
+  if (holdMs) {
+    setTimeout(() => {
+      el.classList.add("out");
+      setTimeout(() => el.classList.add("hidden"), 400);
+    }, holdMs);
+  }
+}
+
+// Resolve no sooner than TOAST_MIN_MS after the spinner appeared.
+function afterMinimum(fn) {
+  const waited = Date.now() - checkStarted;
+  setTimeout(fn, Math.max(0, TOAST_MIN_MS - waited));
+}
+
+function onUpdateStatus(s) {
+  updateState = s || { state: "" };
+  switch (s.state) {
+    case "checking":
+      checkStarted = Date.now();
+      toast("Checking for updates…");
+      setVersionLine();
+      break;
+
+    case "current":
+      afterMinimum(() => { toast("You're up to date", "done", 2200); setVersionLine(); });
+      break;
+
+    case "unreachable":
+      // Standing in a can there is no route to the internet. Say so plainly
+      // rather than implying something is broken.
+      afterMinimum(() => { toast("No connection — could not check", "warn", 2600); setVersionLine(); });
+      break;
+
+    case "available":
+      afterMinimum(() => {
+        $("toast").classList.add("hidden");
+        setVersionLine();
+        showUpdate(s);
+      });
+      break;
+
+    default: // "off" or "dev": nothing was checked, so show nothing
+      $("toast").classList.add("hidden");
+      setVersionLine();
+  }
+}
+
 // ---------- update notice ----------
 //
 // Shown only when a newer release actually exists, which is rare. The app
@@ -467,7 +552,7 @@ async function boot() {
     }
   };
 
-  runtime.EventsOn("update-available", showUpdate);
+  runtime.EventsOn("update-status", onUpdateStatus);
   runtime.EventsOn("captured", async () => render(await call("State")));
   runtime.EventsOn("rejected", async (msg) => { hint(msg, true); render(await call("State")); });
   runtime.EventsOn("notice", (msg) => hint(msg, true));

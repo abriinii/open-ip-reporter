@@ -318,3 +318,48 @@ td.note { color: var(--text-2); white-space: nowrap; overflow: hidden; text-over
 }
 .never { flex: 1; display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--text-2); cursor: pointer; }
 .never input { margin: 0; }
+
+/* ---------- launch toast and version line ---------- */
+
+.status-hint { flex: 1; font-size: 12px; }   /* was margin-left:auto */
+.version-line {
+  font: 11px var(--mono);
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.version-line .ok { color: var(--good, #2e7d32); }
+.version-line .stale { color: var(--accent); cursor: pointer; text-decoration: underline; }
+
+.toast {
+  position: fixed;
+  right: 18px; bottom: 18px;
+  z-index: 60;
+  display: flex; align-items: center; gap: 9px;
+  padding: 10px 14px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0,0,0,.14);
+  font-size: 13px; color: var(--text);
+  opacity: 1;
+  transition: opacity .35s ease, transform .35s ease;
+}
+.toast.hidden { display: none; }
+.toast.out { opacity: 0; transform: translateY(6px); }
+
+.spin {
+  width: 14px; height: 14px; flex: 0 0 auto;
+  border: 2px solid var(--line);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+}
+.spin.done { border: 0; animation: none; color: var(--good, #2e7d32); font-size: 14px; line-height: 1; }
+.spin.done::before { content: "\2713"; }
+.spin.warn { border: 0; animation: none; color: var(--text-3); font-size: 14px; line-height: 1; }
+.spin.warn::before { content: "\2014"; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+:root { --good: #2e7d32; }
+@media (prefers-color-scheme: dark) { :root { --good: #6ccf74; } }

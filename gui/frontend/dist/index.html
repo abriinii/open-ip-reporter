@@ -71,9 +71,16 @@
     <footer class="status">
       <span id="status-text">0 Devices Connected</span>
       <span id="status-hint" class="status-hint"></span>
+      <span id="version-line" class="version-line"></span>
     </footer>
   </section>
 </main>
+
+<!-- Shown briefly on launch so the check is visible rather than invisible. -->
+<div id="toast" class="toast hidden">
+  <span id="toast-spin" class="spin"></span>
+  <span id="toast-text"></span>
+</div>
 
 <!-- Only ever appears when a newer release actually exists. -->
 <div id="updatedlg" class="overlay hidden">
