@@ -112,6 +112,8 @@ Flags for `capture`:
 -out DIR        where to write capture files       (default "captures")
 -ports LIST     listen on exactly these ports      e.g. "14235,8888,14200-14300"
 -add LIST       listen on the defaults plus these  e.g. "48899,9527"
+-mute LIST      keep these ports off the screen    e.g. "10001"
+                (they are still recorded in full)
 -quiet          do not print each packet to the screen
 ```
 
@@ -124,11 +126,34 @@ Run `ipreporter sniff`. It prints the exact `tcpdump` command for your Mac —
 tcpdump ships with macOS, needs no install, and sees **every** port. One run
 identifies the port permanently.
 
-### Notes on reading a capture
+### Background noise is normal
 
-- **Background noise is normal.** Office LANs broadcast constantly (mDNS, SSDP,
-  NetBIOS, printers). The summary at the end groups packets by port so miner
-  traffic is easy to pick out.
+The moment you start it you will see traffic, before you touch a single miner.
+That is the network talking to itself, and it means the tool is working.
+
+The most common one on a mining site is a 4-byte `01 00 00 00` on **udp/10001**
+arriving every ~10 seconds from a pile of `.254` addresses. That is **Ubiquiti
+UniFi device discovery** — your switches and gateways announcing themselves,
+not miners.
+
+Two things keep it from burying a real report:
+
+- **Repeated identical payloads collapse automatically.** The first few print in
+  full, then the tool counts the rest instead of printing them. Two miners
+  reporting always produce two *different* payloads (the MAC is in there), so
+  this only ever hides beacons.
+- **`-mute` silences a port entirely** if you want it gone:
+
+  ```
+  ipreporter capture -mute 10001
+  ```
+
+Neither one affects the capture files. **Everything received is always written
+to disk in full**, no matter what the screen shows. The end-of-run summary
+labels each port so infrastructure chatter is easy to tell apart from a port
+worth investigating.
+
+### Other notes on reading a capture
 - **A few ports failing to bind is normal.** "address already in use" means
   another program holds it; "permission denied" means it is below 1024 and
   needs admin. Everything else still binds, and the failures are listed at the

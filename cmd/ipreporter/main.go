@@ -60,6 +60,8 @@ capture flags:
   -out DIR        where to write capture files       (default "captures")
   -ports LIST     listen on exactly these ports      e.g. "14235,8888,14200-14300"
   -add LIST       listen on the defaults plus these  e.g. "48899,9527"
+  -mute LIST      keep these ports off the screen    e.g. "10001"
+                  (they are still recorded in full)
   -quiet          do not print each packet to the screen
 
 `)
@@ -70,6 +72,7 @@ func runCapture(args []string) int {
 	out := fs.String("out", "captures", "directory to write capture files into")
 	portList := fs.String("ports", "", "listen on exactly these ports instead of the defaults")
 	addList := fs.String("add", "", "listen on the default ports plus these")
+	muteList := fs.String("mute", "", "keep these ports off the screen (still recorded)")
 	quiet := fs.Bool("quiet", false, "do not print each packet to the screen")
 	fs.Parse(args)
 
@@ -91,6 +94,16 @@ func runCapture(args []string) int {
 		ports = capture.Dedup(append(append([]int{}, ports...), extra...))
 	}
 
+	var mute []int
+	if *muteList != "" {
+		m, err := capture.ParsePorts(*muteList)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: -mute: %v\n", err)
+			return 2
+		}
+		mute = m
+	}
+
 	fmt.Println()
 	fmt.Println("  BetterIPReporter — capture mode (Phase 0)")
 	fmt.Println()
@@ -106,6 +119,7 @@ func runCapture(args []string) int {
 
 	err := capture.Run(capture.Options{
 		Ports:  ports,
+		Mute:   mute,
 		OutDir: *out,
 		Quiet:  *quiet,
 	}, stop)

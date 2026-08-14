@@ -23,9 +23,15 @@ import (
 	"time"
 )
 
+// repeatShowLimit is how many copies of an identical payload get printed in
+// full before the console collapses them to a count. The capture files are
+// never affected by this.
+const repeatShowLimit = 3
+
 // Options controls a capture run.
 type Options struct {
 	Ports  []int  // UDP ports to bind
+	Mute   []int  // ports to keep off the console (still fully recorded)
 	OutDir string // directory to write capture files into
 	Quiet  bool   // suppress per-packet console output
 }
@@ -111,11 +117,17 @@ func Run(opts Options, stop <-chan struct{}) error {
 		}(c)
 	}
 
+	muted := make(map[int]bool, len(opts.Mute))
+	for _, p := range opts.Mute {
+		muted[p] = true
+	}
+
 	// One writer goroutine owns both files, so no locking is needed and the
 	// two files stay in the same order.
 	counts := map[int]int{}
 	sources := map[string]bool{}
-	total := 0
+	repeats := map[string]int{}
+	total, hidden := 0, 0
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
@@ -124,6 +136,7 @@ func Run(opts Options, stop <-chan struct{}) error {
 			total++
 			counts[p.DstPort]++
 			sources[p.SrcIP] = true
+			hexStr := hex.EncodeToString(p.Data)
 
 			enc.Encode(jsonRecord{
 				TS:      p.TS.Format(time.RFC3339Nano),
@@ -131,7 +144,7 @@ func Run(opts Options, stop <-chan struct{}) error {
 				SrcPort: p.SrcPort,
 				DstPort: p.DstPort,
 				Len:     len(p.Data),
-				Hex:     hex.EncodeToString(p.Data),
+				Hex:     hexStr,
 				ASCII:   printableASCII(p.Data),
 			})
 			jsonlFile.Sync() // flush every packet: a crash must not lose the walk
@@ -139,8 +152,40 @@ func Run(opts Options, stop <-chan struct{}) error {
 			block := formatPacket(total, p)
 			io.WriteString(textFile, block)
 			textFile.Sync()
-			if !opts.Quiet {
+
+			// Everything above is unconditional: the files always get every
+			// packet. Only the console is filtered, so that infrastructure
+			// chatter cannot bury the one packet you walked over to see.
+			if opts.Quiet {
+				continue
+			}
+
+			// Identical payload on the same port, over and over, is a beacon
+			// rather than a miner: two miners reporting produce two different
+			// payloads, because the MAC is in there. Show the first few, then
+			// count the rest.
+			key := fmt.Sprintf("%d|%s", p.DstPort, hexStr)
+			repeats[key]++
+
+			switch {
+			case muted[p.DstPort]:
+				hidden++
+			case repeats[key] < repeatShowLimit:
 				io.WriteString(os.Stdout, block)
+			case repeats[key] == repeatShowLimit:
+				io.WriteString(os.Stdout, block)
+				fmt.Printf("  ^ udp/%d keeps repeating this exact payload — background\n"+
+					"    chatter, not a miner. Further copies will be counted instead of\n"+
+					"    printed. Every one is still recorded in the capture files.\n"+
+					"    Hide this port entirely with:  -mute %d\n",
+					p.DstPort, p.DstPort)
+			default:
+				hidden++
+			}
+
+			// A heartbeat, so a screen full of nothing still looks alive.
+			if hidden > 0 && hidden%200 == 0 {
+				fmt.Printf("  … still listening (%d background packets hidden so far)\n", hidden)
 			}
 		}
 	}()
@@ -154,7 +199,7 @@ func Run(opts Options, stop <-chan struct{}) error {
 	close(packets)
 	<-done
 
-	summary := formatSummary(total, counts, sources, bindErrs)
+	summary := formatSummary(total, hidden, counts, sources, bindErrs)
 	io.WriteString(textFile, summary)
 	fmt.Print(summary)
 
@@ -238,11 +283,30 @@ func formatPacket(n int, p Packet) string {
 	return b.String()
 }
 
-func formatSummary(total int, counts map[int]int, sources map[string]bool, bindErrs []string) string {
+// knownPorts labels traffic we have already identified, so a port that is just
+// site infrastructure is not mistaken for a miner that needs investigating.
+var knownPorts = map[int]string{
+	14235: "Antminer IP Reporter  <- what we want",
+	10001: "Ubiquiti UniFi device discovery (background)",
+	5353:  "mDNS / Bonjour (background)",
+	1900:  "SSDP (background)",
+	137:   "NetBIOS name service (background)",
+	138:   "NetBIOS datagram (background)",
+	67:    "DHCP server (background)",
+	68:    "DHCP client (background)",
+	5355:  "LLMNR (background)",
+	123:   "NTP (background)",
+}
+
+func formatSummary(total, hidden int, counts map[int]int, sources map[string]bool, bindErrs []string) string {
 	var b strings.Builder
 	b.WriteString("\n" + strings.Repeat("─", 72) + "\n")
 	fmt.Fprintf(&b, "\n  SUMMARY\n\n  %d packets from %d distinct source addresses.\n",
 		total, len(sources))
+	if hidden > 0 {
+		fmt.Fprintf(&b, "  %d were hidden from the screen as repetitive background traffic.\n"+
+			"  All of them are in the capture files regardless.\n", hidden)
+	}
 
 	if len(counts) > 0 {
 		ports := make([]int, 0, len(counts))
@@ -252,11 +316,11 @@ func formatSummary(total int, counts map[int]int, sources map[string]bool, bindE
 		sort.Slice(ports, func(i, j int) bool { return counts[ports[i]] > counts[ports[j]] })
 		b.WriteString("\n  Packets by destination port:\n")
 		for _, p := range ports {
-			label := ""
-			if p == 14235 {
-				label = "   <- Antminer IP Reporter"
+			label := knownPorts[p]
+			if label == "" {
+				label = "unidentified — worth a look"
 			}
-			fmt.Fprintf(&b, "    udp/%-6d %5d%s\n", p, counts[p], label)
+			fmt.Fprintf(&b, "    udp/%-6d %5d   %s\n", p, counts[p], label)
 		}
 	}
 
