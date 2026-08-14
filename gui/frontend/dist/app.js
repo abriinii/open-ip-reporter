@@ -558,6 +558,11 @@ async function boot() {
   runtime.EventsOn("notice", (msg) => hint(msg, true));
 
   render(await call("State"));
+  setVersionLine();
+
+  // Last, and only now: the handlers above have to exist before the reply can
+  // arrive, or a fast answer lands with nothing listening and is lost.
+  call("CheckForUpdate");
 }
 
 window.addEventListener("DOMContentLoaded", boot);
