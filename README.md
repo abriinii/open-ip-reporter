@@ -27,11 +27,16 @@ missed machine no longer silently shifts every pairing after it.
 
 ### Windows
 
-Double-click `ipreporter-windows-x64.exe`.
+Double-click `ipreporter-windows-x64.exe`. Two prompts, both expected:
 
-Windows Firewall will ask whether to allow it. **Click Allow, and make sure
-"Private networks" is ticked.** If you miss this prompt the tool will run and
-hear nothing. (Needs an administrator to click it.)
+1. **"Windows protected your PC"** (SmartScreen, because the binary is
+   unsigned). Click **More info**, then **Run anyway**. If there is no "More
+   info" link, right-click the file → **Properties** → tick **Unblock** at the
+   bottom → **OK**, then run it again.
+
+2. **Windows Defender Firewall** asks whether to allow it. **Click Allow, and
+   make sure "Private networks" is ticked.** If you miss this prompt the tool
+   runs but hears nothing. An administrator has to click it.
 
 ### macOS
 
