@@ -414,6 +414,33 @@ async function refreshCans() {
   if (cans.includes(previous)) sel.value = previous;
 }
 
+// ---------- update notice ----------
+//
+// Shown only when a newer release actually exists, which is rare. The app
+// never downloads or installs anything; this is a notification and a link.
+
+function showUpdate(rel) {
+  if (!rel || !rel.version) return;
+  $("up-version").textContent = rel.version;
+  $("up-current").textContent = state?.version || "an older version";
+  $("up-notes").textContent = rel.notes || "No release notes were published for this version.";
+  $("up-never").checked = false;
+  $("updatedlg").classList.remove("hidden");
+  prompting = true;
+}
+
+function closeUpdate() {
+  if ($("up-never").checked) call("SetCheckForUpdates", false);
+  $("updatedlg").classList.add("hidden");
+  prompting = false;
+}
+
+$("up-later").onclick = closeUpdate;
+$("up-open").onclick = async () => { await call("OpenReleasePage"); closeUpdate(); };
+document.addEventListener("keydown", (ev) => {
+  if (ev.key === "Escape" && !$("updatedlg").classList.contains("hidden")) closeUpdate();
+});
+
 // ---------- start / stop ----------
 
 async function boot() {
@@ -440,6 +467,7 @@ async function boot() {
     }
   };
 
+  runtime.EventsOn("update-available", showUpdate);
   runtime.EventsOn("captured", async () => render(await call("State")));
   runtime.EventsOn("rejected", async (msg) => { hint(msg, true); render(await call("State")); });
   runtime.EventsOn("notice", (msg) => hint(msg, true));

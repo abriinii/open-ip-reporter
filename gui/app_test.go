@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -388,5 +390,54 @@ func TestNoWrongCanWarningForCansThisSiteDoesNotHave(t *testing.T) {
 	}
 	if a.State().Error != "" {
 		t.Errorf("warned about a can this site does not have: %q", a.State().Error)
+	}
+}
+
+// The update check is the only outbound traffic in the program, so the off
+// switch has to actually stop it.
+func TestUpdateCheckRespectsTheOffSwitch(t *testing.T) {
+	a := newTestApp(t)
+	a.settingsPath = filepath.Join(t.TempDir(), "settings.json")
+
+	called := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.Write([]byte(`{"tag_name":"v99.0.0"}`))
+	}))
+	defer srv.Close()
+
+	a.version = "v1.0.0"
+	a.SetCheckForUpdates(false)
+	a.checkForUpdate()
+	if called {
+		t.Error("checked for updates after being told not to")
+	}
+
+	// And back on again.
+	a.SetCheckForUpdates(true)
+	if on := a.loadSettings().CheckForUpdates; on == nil || !*on {
+		t.Error("could not turn the check back on")
+	}
+}
+
+// Default on, since that is what was asked for, but only after a real decision
+// rather than by accident of a missing file.
+func TestUpdateCheckIsOnByDefault(t *testing.T) {
+	a := newTestApp(t)
+	a.settingsPath = filepath.Join(t.TempDir(), "settings.json")
+	if on := a.loadSettings().CheckForUpdates; on == nil || !*on {
+		t.Error("a fresh install has the update check off")
+	}
+}
+
+// A dev build must not phone home at all.
+func TestDevBuildDoesNotCheck(t *testing.T) {
+	a := newTestApp(t)
+	a.settingsPath = filepath.Join(t.TempDir(), "settings.json")
+	a.version = "dev"
+	a.updateRepo = "x/y"
+	a.checkForUpdate() // would panic on a nil ctx if it tried to emit
+	if a.latest != nil {
+		t.Error("a dev build reported an update")
 	}
 }

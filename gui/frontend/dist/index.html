@@ -75,6 +75,25 @@
   </section>
 </main>
 
+<!-- Only ever appears when a newer release actually exists. -->
+<div id="updatedlg" class="overlay hidden">
+  <div class="dialog narrow">
+    <header class="dlg-head">
+      <h2>Version <span id="up-version"></span> is available</h2>
+      <p>You are running <span id="up-current"></span>. Nothing is downloaded or
+         installed by this app — the button opens the release page in your browser.</p>
+    </header>
+    <div class="dlg-body">
+      <pre id="up-notes" class="notes"></pre>
+    </div>
+    <footer class="dlg-foot">
+      <label class="never"><input type="checkbox" id="up-never"> Stop checking</label>
+      <button id="up-later" class="tool">Later</button>
+      <button id="up-open" class="primary-sm">Open download page</button>
+    </footer>
+  </div>
+</div>
+
 <!-- Set up once per site. Deliberately out of the walking screen. -->
 <div id="cansdlg" class="overlay hidden">
   <div class="dialog">

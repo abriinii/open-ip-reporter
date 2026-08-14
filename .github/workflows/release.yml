@@ -78,6 +78,11 @@ jobs:
 
       - name: Build app
         working-directory: gui
+        # bash on both runners on purpose: the default shell on Windows is
+        # PowerShell, where $GITHUB_REF_NAME is an undefined variable rather
+        # than the environment variable, and the app would be stamped with an
+        # empty version — which silently disables its update check.
+        shell: bash
         run: wails build -platform ${{ matrix.platform }} -ldflags "-X main.version=$GITHUB_REF_NAME"
 
       - name: Package

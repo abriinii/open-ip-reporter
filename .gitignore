@@ -76,3 +76,6 @@ Thumbs.db
 
 # Site layout, written next to the app. Local to each install.
 /cans.json
+
+# Local preferences, written next to the app.
+/settings.json

@@ -277,6 +277,19 @@ be recorded during the walk. It cannot be recovered afterwards.
   in Sheets beforehand and that process works; this tool slots into the
   existing workflow without changing anyone else's job.
 
+## Update notice
+
+On startup the app asks GitHub whether a newer release exists, and shows the
+release notes if so. It never downloads or installs anything — the button opens
+the download page in your browser.
+
+Turn it off with the checkbox on that notice. Off, the app makes no outbound
+network requests at all. It also stays quiet when there is no route to the
+internet, which is the usual case standing in a can.
+
+Nothing about your site is sent. The request carries only the program name and
+its version. See [CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md#privacy).
+
 ## Privacy
 
 Captures and exports contain real MAC addresses, IPs and site layout.

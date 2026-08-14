@@ -58,23 +58,32 @@ proprietary or closed-source component is included.
 
 ## Privacy
 
-**This software collects nothing, stores nothing remotely, and transmits
-nothing.**
+**This software collects no data about you and sends none anywhere.**
 
-Specifically:
+It makes exactly one outbound request, and it is worth describing precisely:
 
-- It contains no code that sends network traffic. It opens UDP sockets and
-  reads from them. There is no transmit path, no telemetry, no update check,
-  and no crash reporting.
-- Data it records — miner IP addresses, MAC addresses, and rack positions —
-  is written only to files on the machine it runs on, in `sessions/` and
-  wherever the operator chooses to export a CSV.
-- No account, licence key, or registration is required or offered.
-- Nothing is written outside the working directory and the file the operator
-  picks in the export dialog.
+- **On startup it asks GitHub whether a newer release exists**, by fetching
+  `https://api.github.com/repos/abriinii/open-ip-reporter/releases/latest`.
+  Nothing is sent but the request itself and a `User-Agent` naming the program
+  and its version. GitHub necessarily sees the requesting IP address, as it
+  would for any web request.
+- **Nothing is downloaded or installed.** If a newer version exists you are
+  shown its release notes and a button that opens the download page in your
+  browser. The program never replaces itself.
+- **It can be turned off**, from the checkbox on that notice, and the choice is
+  remembered in `settings.json`. Turned off, the program makes no outbound
+  network requests at all.
+- The check fails silently when there is no route to the internet, which is the
+  normal case on a miner network.
 
-Because nothing is collected, there is no data to disable collection of, and
-no consent prompt is shown.
+Beyond that: no telemetry, no analytics, no crash reporting, no account,
+licence key, or registration.
+
+Everything the program records — miner IP addresses, MAC addresses, notes and
+rack positions — is written only to files on the machine it runs on, in
+`sessions/` and wherever you choose to export a CSV. **None of it is ever
+transmitted anywhere**, including in the update check. Nothing is written
+outside the working directory and the file you pick in the export dialog.
 
 ## Uninstalling
 

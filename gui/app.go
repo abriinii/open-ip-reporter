@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"sync"
 	"time"
@@ -12,6 +14,7 @@ import (
 	"openipreporter/internal/export"
 	"openipreporter/internal/parse"
 	"openipreporter/internal/site"
+	"openipreporter/internal/update"
 	"openipreporter/internal/walk"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -49,17 +52,23 @@ type App struct {
 	stopListen chan struct{}
 	listenDone <-chan struct{}
 
-	sessionDir string
-	cansPath   string
-	layout     site.Site
+	sessionDir   string
+	cansPath     string
+	settingsPath string
+	version      string
+	updateRepo   string
+	latest       *update.Release
+	layout       site.Site
 }
 
 func NewApp() *App {
 	return &App{
-		lastReport: map[string]time.Time{},
-		unknown:    map[int]int{},
-		sessionDir: "sessions",
-		cansPath:   "cans.json",
+		lastReport:   map[string]time.Time{},
+		unknown:      map[int]int{},
+		sessionDir:   "sessions",
+		cansPath:     "cans.json",
+		settingsPath: "settings.json",
+		updateRepo:   "abriinii/open-ip-reporter",
 		// Seeded so the app is usable before startup has read the file, and so
 		// a failure to read it later degrades to the defaults rather than to an
 		// empty list with no cans to pick.
@@ -70,6 +79,7 @@ func NewApp() *App {
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	a.loadLayout()
+	go a.checkForUpdate()
 	a.startListening()
 }
 
@@ -263,6 +273,72 @@ func (a *App) SaveLayout(cans []site.Can) State {
 	a.layoutErr = ""
 	return a.stateLocked("")
 }
+
+// settings is the handful of preferences worth remembering between runs.
+type settings struct {
+	// CheckForUpdates is the only outbound network traffic this program makes,
+	// so it gets an explicit off switch rather than being buried.
+	CheckForUpdates *bool `json:"checkForUpdates,omitempty"`
+}
+
+func (a *App) loadSettings() settings {
+	var s settings
+	data, err := os.ReadFile(a.settingsPath)
+	if err == nil {
+		json.Unmarshal(data, &s)
+	}
+	if s.CheckForUpdates == nil {
+		on := true
+		s.CheckForUpdates = &on
+	}
+	return s
+}
+
+func (a *App) saveSettings(s settings) {
+	if data, err := json.MarshalIndent(s, "", "  "); err == nil {
+		os.WriteFile(a.settingsPath, append(data, '\n'), 0o644)
+	}
+}
+
+// SetCheckForUpdates turns the version check on or off, and remembers it.
+func (a *App) SetCheckForUpdates(on bool) {
+	s := a.loadSettings()
+	s.CheckForUpdates = &on
+	a.saveSettings(s)
+}
+
+// checkForUpdate asks GitHub whether a newer release exists.
+//
+// Runs in the background and never blocks the window opening. Failure is
+// expected and silent: the machine walking a rack is on the miner network,
+// which usually has no route to the internet at all.
+func (a *App) checkForUpdate() {
+	if on := a.loadSettings().CheckForUpdates; on == nil || !*on {
+		return
+	}
+	rel, err := update.NewChecker(a.updateRepo).Check(context.Background(), a.version)
+	if err != nil || rel == nil {
+		return
+	}
+	a.mu.Lock()
+	a.latest = rel
+	a.mu.Unlock()
+	a.emit("update-available", rel)
+}
+
+// OpenReleasePage sends the operator to the download page in their browser.
+// Nothing is downloaded or installed by this program.
+func (a *App) OpenReleasePage() {
+	a.mu.Lock()
+	rel := a.latest
+	a.mu.Unlock()
+	if rel != nil && rel.URL != "" {
+		runtime.BrowserOpenURL(a.ctx, rel.URL)
+	}
+}
+
+// Version is the running build, shown next to the update notice.
+func (a *App) Version() string { return a.version }
 
 // Cans lists the cans that can be walked, in floor order.
 func (a *App) Cans() []string {
@@ -501,6 +577,7 @@ type State struct {
 	NextRow    int    `json:"nextRow"`
 	Recorded   int    `json:"recorded"`
 	Exported   string `json:"exported"`
+	Version    string `json:"version"`
 	Copied     string `json:"copied"` // what just went on the clipboard, for confirmation
 	Full       bool   `json:"full"`
 	CanUndo    bool   `json:"canUndo"`
@@ -515,6 +592,7 @@ func (a *App) stateLocked(errMsg string) State {
 		Listening:  a.listening,
 		BoundPorts: a.boundPorts,
 		Exported:   a.exported,
+		Version:    a.version,
 		Error:      errMsg,
 	}
 	if a.session == nil {

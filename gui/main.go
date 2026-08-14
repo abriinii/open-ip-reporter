@@ -19,8 +19,12 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
+// version is set at build time by the release workflow, matching the tag.
+var version = "dev"
+
 func main() {
 	app := NewApp()
+	app.version = version
 
 	err := wails.Run(&options.App{
 		Title:  "OpenIPReporter",
