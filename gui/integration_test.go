@@ -120,3 +120,84 @@ func TestRealSocketToCSV(t *testing.T) {
 		t.Errorf("file has %d rows, want 4 — one per position walked", lines)
 	}
 }
+
+// Both vendors through one listener, on their own ports and formats. This is
+// the thing that justifies replacing two separate vendor tools with one.
+func TestBothVendorsLandInOneRack(t *testing.T) {
+	a := newTestApp(t)
+	a.StartSession("B2", 1)
+
+	stop := make(chan struct{})
+	defer close(stop)
+
+	got := make(chan struct{}, 8)
+	if _, err := capture.Listen(
+		[]int{parse.AntminerPort, parse.WhatsminerPort},
+		func(p capture.Packet) { a.onPacket(p); got <- struct{}{} },
+		stop,
+	); err != nil {
+		t.Fatalf("bind: %v", err)
+	}
+
+	send := func(port int, payload string) {
+		t.Helper()
+		c, err := net.Dial("udp4", fmt.Sprintf("127.0.0.1:%d", port))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer c.Close()
+		c.Write([]byte(payload))
+	}
+	await := func(n int) {
+		t.Helper()
+		for i := 0; i < n; i++ {
+			select {
+			case <-got:
+			case <-time.After(3 * time.Second):
+				t.Fatalf("packet %d never arrived", i+1)
+			}
+		}
+	}
+
+	send(parse.AntminerPort, "22.1.1.10,02:81:f5:ea:e1:db")
+	await(1)
+	send(parse.WhatsminerPort, "IP:22.1.1.11MAC:00:0a:35:1b:2c:3d")
+	await(1)
+	send(parse.AntminerPort, "22.1.1.12,02:ad:af:02:ff:45")
+	await(1)
+
+	st := a.State()
+	if len(st.Entries) != 3 {
+		t.Fatalf("got %d rows, want 3 (two vendors interleaved)", len(st.Entries))
+	}
+	want := []string{"02:81:f5:ea:e1:db", "00:0a:35:1b:2c:3d", "02:ad:af:02:ff:45"}
+	for i, mac := range want {
+		if st.Entries[i].MAC != mac {
+			t.Errorf("row %d = %s, want %s", i+1, st.Entries[i].MAC, mac)
+		}
+	}
+	if st.Entries[1].Label != "C1/2" {
+		t.Errorf("the Whatsminer landed at %s, want C1/2", st.Entries[1].Label)
+	}
+}
+
+// Stopping must keep the rack so it can be exported, and must stop recording.
+func TestStopKeepsTheRackButStopsRecording(t *testing.T) {
+	a := newTestApp(t)
+	a.StartSession("B2", 1)
+	a.onPacket(antminerPacket("22.1.1.10", "02:81:f5:ea:e1:db", time.Now()))
+
+	st := a.StopSession()
+	if st.Active {
+		t.Error("still walking after Stop")
+	}
+	if !st.HasSession || len(st.Entries) != 1 {
+		t.Fatalf("Stop discarded the rack: hasSession=%v rows=%d", st.HasSession, len(st.Entries))
+	}
+
+	// A press after Stop must not be recorded.
+	a.onPacket(antminerPacket("22.1.1.11", "02:ad:af:02:ff:45", time.Now()))
+	if n := len(a.State().Entries); n != 1 {
+		t.Errorf("recorded %d rows after Stop, want 1", n)
+	}
+}

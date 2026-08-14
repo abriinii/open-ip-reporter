@@ -4,10 +4,27 @@
 const go = () => window.go.main.App;
 const $ = (id) => document.getElementById(id);
 
+// Every backend call goes through here. A rejected promise used to mean a
+// button that silently did nothing, with no way to tell a broken call from a
+// no-op.
+async function call(name, ...args) {
+  try {
+    const fn = go()?.[name];
+    if (typeof fn !== "function") {
+      hint(`${name} is not available in this build`, true);
+      return null;
+    }
+    return await fn(...args);
+  } catch (e) {
+    hint(`${name} failed: ${e && e.message ? e.message : e}`, true);
+    return null;
+  }
+}
+
 let state = null;
 let selected = -1;
 let lastCount = 0;
-let editing = false;   // suppress global keys while a text box has focus
+let prompting = false; // a modal prompt is open
 let hintTimer = null;
 
 // ---------- rendering ----------
@@ -34,11 +51,14 @@ function render(s) {
 
   $("undo").disabled = !s.canUndo;
   $("redo").disabled = !s.canRedo;
-  $("export").disabled = !s.active || s.entries.length === 0;
+  // Exporting is what you do when the walking is done, so it unlocks on Stop.
+  $("export").disabled = s.active || !s.hasSession || s.entries.length === 0;
+  $("export").title = s.active ? "Press Stop to export" : "Export this rack as CSV";
 
   $("status-text").textContent =
     `${s.recorded} Device${s.recorded === 1 ? "" : "s"} Connected` +
-    (s.active ? `  ·  ${s.can} rack ${s.rack}  ·  ${s.entries.length} of ${s.positions} positions` : "");
+    (s.hasSession ? `  ·  ${s.can} rack ${s.rack}  ·  ${s.entries.length} of ${s.positions} positions` : "") +
+    (s.hasSession && !s.active ? "  ·  stopped" : "");
 
   if (s.error) hint(s.error, true);
   else if (!s.listening) hint("not listening — no ports could be opened", true);
@@ -89,6 +109,14 @@ function hint(msg, warn) {
   hintTimer = setTimeout(() => { el.textContent = ""; el.className = "status-hint"; }, 4000);
 }
 
+// Derived from the DOM rather than tracked in a flag: disabling an element
+// while it holds focus does not reliably fire blur, and a stuck flag would
+// silently disable every keyboard shortcut including undo.
+function typingInABox() {
+  const el = document.activeElement;
+  return !!el && (el.tagName === "INPUT" || el.tagName === "SELECT" || el.isContentEditable);
+}
+
 function esc(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -131,17 +159,17 @@ $("ctx").onclick = async (ev) => {
     case "mac": await editMAC(selected); break;
     case "pos": await editRowPosition(selected); break;
     case "note": await editNote(selected); break;
-    case "insert": render(await go().InsertBlankAbove(selected)); break;
+    case "insert": render(await call("InsertBlankAbove", selected)); break;
     case "delete": await deleteRow(); break;
   }
 };
 
 $("export").onclick = async () => {
-  if (!$("export").disabled) render(await go().Export());
+  if (!$("export").disabled) render(await call("Export"));
 };
 
-$("undo").onclick = async () => render(await go().Undo());
-$("redo").onclick = async () => render(await go().Redo());
+$("undo").onclick = async () => render(await call("Undo"));
+$("redo").onclick = async () => render(await call("Redo"));
 
 // ---------- position boxes ----------
 //
@@ -156,7 +184,7 @@ async function commitPosition() {
   if (!Number.isFinite(row) || !Number.isFinite(col)) return;
   if (row === state.nextRow && col === state.nextColumn) return;
 
-  const s = await go().SetNextPosition(col, row);
+  const s = await call("SetNextPosition", col, row);
   const bad = !!s.error;
   $("row").classList.toggle("bad", bad);
   $("column").classList.toggle("bad", bad);
@@ -164,15 +192,10 @@ async function commitPosition() {
 }
 
 for (const id of ["row", "column"]) {
-  $(id).addEventListener("focus", () => { editing = true; });
-  $(id).addEventListener("blur", () => { editing = false; commitPosition(); });
+  $(id).addEventListener("blur", () => commitPosition());
   $(id).addEventListener("keydown", (ev) => {
     if (ev.key === "Enter") { ev.preventDefault(); $(id).blur(); }
   });
-}
-for (const id of ["rack", "can"]) {
-  $(id).addEventListener("focus", () => { editing = true; });
-  $(id).addEventListener("blur", () => { editing = false; });
 }
 
 // ---------- keys ----------
@@ -181,13 +204,13 @@ for (const id of ["rack", "can"]) {
 // no mouse, nothing to hit accurately while holding a torch.
 
 document.addEventListener("keydown", async (ev) => {
-  if (editing || !state?.active) return;
+  if (prompting || typingInABox() || !state?.active) return;
   const rows = state?.entries?.length ?? 0;
 
   switch (ev.key) {
     case " ":
       ev.preventDefault();
-      render(await go().Skip());
+      render(await call("Skip"));
       break;
 
     case "ArrowDown":
@@ -212,7 +235,7 @@ document.addEventListener("keydown", async (ev) => {
       break;
 
     case "i": case "I":
-      if (selected >= 0) { ev.preventDefault(); render(await go().InsertBlankAbove(selected)); }
+      if (selected >= 0) { ev.preventDefault(); render(await call("InsertBlankAbove", selected)); }
       break;
 
     case "n": case "N":
@@ -224,51 +247,51 @@ document.addEventListener("keydown", async (ev) => {
       break;
 
     case "z": case "Z":
-      if (ev.ctrlKey || ev.metaKey) { ev.preventDefault(); render(await go().Undo()); }
+      if (ev.ctrlKey || ev.metaKey) { ev.preventDefault(); render(await call("Undo")); }
       break;
 
     case "y": case "Y":
-      if (ev.ctrlKey || ev.metaKey) { ev.preventDefault(); render(await go().Redo()); }
+      if (ev.ctrlKey || ev.metaKey) { ev.preventDefault(); render(await call("Redo")); }
       break;
 
     case "e": case "E":
-      if (ev.ctrlKey || ev.metaKey) { ev.preventDefault(); render(await go().Export()); }
+      if (ev.ctrlKey || ev.metaKey) { ev.preventDefault(); render(await call("Export")); }
       break;
   }
 });
 
 async function deleteRow() {
-  render(await go().Delete(selected));
+  render(await call("Delete", selected));
   selected = Math.min(selected, (state?.entries?.length ?? 1) - 1);
   renderRows(state);
 }
 
 async function editMAC(i) {
-  editing = true;
+  prompting = true;
   try {
     const cur = state.entries[i]?.mac ?? "";
     const val = window.prompt("MAC address for this position (empty = skipped):", cur);
     if (val === null) return;
-    render(await go().SetMAC(i, val.trim()));
-  } finally { editing = false; }
+    render(await call("SetMAC", i, val.trim()));
+  } finally { prompting = false; }
 }
 
 async function editNote(i) {
-  editing = true;
+  prompting = true;
   try {
     const cur = state.entries[i]?.note ?? "";
     const val = window.prompt(
       "Note for this position — why it was skipped, or anything worth\n" +
       "finding again later. It is saved with the exported CSV.", cur);
     if (val === null) return;
-    render(await go().SetNote(i, val));
-  } finally { editing = false; }
+    render(await call("SetNote", i, val));
+  } finally { prompting = false; }
 }
 
 // Repositioning one recorded row, as opposed to moving the walk. Everything
 // below it renumbers to follow.
 async function editRowPosition(i) {
-  editing = true;
+  prompting = true;
   try {
     const e = state.entries[i];
     const val = window.prompt(
@@ -278,14 +301,14 @@ async function editRowPosition(i) {
     if (val === null) return;
     const m = val.match(/^\s*(\d+)\s*[\/,\s]\s*(\d+)\s*$/);
     if (!m) { hint(`"${val}" is not a row/column, e.g. 7/2`, true); return; }
-    render(await go().SetPosition(i, parseInt(m[2], 10), parseInt(m[1], 10)));
-  } finally { editing = false; }
+    render(await call("SetPosition", i, parseInt(m[2], 10), parseInt(m[1], 10)));
+  } finally { prompting = false; }
 }
 
 // ---------- start / stop ----------
 
 async function boot() {
-  const cans = await go().Cans();
+  const cans = await call("Cans");
   const sel = $("can");
   cans.forEach((c) => {
     const o = document.createElement("option");
@@ -294,25 +317,25 @@ async function boot() {
   });
 
   $("startstop").onclick = async () => {
-    if (state?.active) { render(await go().StopSession()); return; }
+    if (state?.active) { render(await call("StopSession")); return; }
     const rack = parseInt($("rack").value, 10);
     if (!Number.isFinite(rack) || rack < 1) { hint("rack must be 1 or higher", true); return; }
     selected = -1;
     lastCount = 0;
-    const s = await go().StartSession(sel.value, rack);
+    const s = await call("StartSession", sel.value, rack);
     render(s);
     if (!s.error) {
       const row = parseInt($("row").value, 10);
       const col = parseInt($("column").value, 10);
-      if (row > 1 || col > 1) render(await go().SetNextPosition(col, row));
+      if (row > 1 || col > 1) render(await call("SetNextPosition", col, row));
     }
   };
 
-  runtime.EventsOn("captured", async () => render(await go().State()));
-  runtime.EventsOn("rejected", async (msg) => { hint(msg, true); render(await go().State()); });
+  runtime.EventsOn("captured", async () => render(await call("State")));
+  runtime.EventsOn("rejected", async (msg) => { hint(msg, true); render(await call("State")); });
   runtime.EventsOn("notice", (msg) => hint(msg, true));
 
-  render(await go().State());
+  render(await call("State"));
 }
 
 window.addEventListener("DOMContentLoaded", boot);

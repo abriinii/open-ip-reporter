@@ -56,6 +56,7 @@ type Handler interface {
 // vendor could plausibly claim, which so far is none.
 var handlers = []Handler{
 	Antminer{},
+	Whatsminer{},
 }
 
 // Duplicate is a MAC that reported more than once outside the double-fire

@@ -33,6 +33,15 @@ type App struct {
 	// recorded at two consecutive positions.
 	lastReport map[string]time.Time
 
+	// walking is whether captures are being recorded. The session outlives it:
+	// stopping ends the walk but keeps the rack in hand so it can be exported.
+	walking bool
+
+	// unknown counts datagrams no handler recognised, by port. A miner type we
+	// cannot parse yet is otherwise indistinguishable from a miner that never
+	// broadcast, which is exactly the dead end Whatsminer produced.
+	unknown map[int]int
+
 	listening  bool
 	boundPorts int
 	exported   string // filename of the most recent export, for the status bar
@@ -44,6 +53,7 @@ type App struct {
 func NewApp() *App {
 	return &App{
 		lastReport: map[string]time.Time{},
+		unknown:    map[int]int{},
 		sessionDir: "sessions",
 	}
 }
@@ -101,13 +111,25 @@ func (a *App) onPacket(p capture.Packet) {
 		TS: p.TS, SrcIP: p.SrcIP, SrcPort: p.SrcPort, DstPort: p.DstPort, Data: p.Data,
 	})
 	if !ok {
+		// Not a miner report we understand. Chatter is constant, so only
+		// count traffic that looks addressed to a miner tool rather than
+		// everything on the wire.
+		if interesting(p.DstPort) {
+			a.mu.Lock()
+			a.unknown[p.DstPort]++
+			n := a.unknown[p.DstPort]
+			a.mu.Unlock()
+			a.emit("notice", fmt.Sprintf(
+				"%d packet(s) on udp/%d that no miner handler recognises — send a capture and it can be supported",
+				n, p.DstPort))
+		}
 		return
 	}
 
 	a.mu.Lock()
-	if a.session == nil {
+	if a.session == nil || !a.walking {
 		a.mu.Unlock()
-		return // nothing to record into yet
+		return // nothing to record into, or the walk is stopped
 	}
 	// The miner's own repeat, not a second machine.
 	if last, seen := a.lastReport[rep.MAC]; seen && p.TS.Sub(last) <= parse.DoubleFireWindow {
@@ -150,6 +172,17 @@ func (a *App) onPacket(p capture.Packet) {
 	a.emit("captured", rep.MAC)
 }
 
+// interesting reports whether an unrecognised packet on this port is worth
+// telling the operator about. The list is the vendor ports we bind on purpose;
+// everything else is background noise and would only cry wolf.
+func interesting(port int) bool {
+	switch port {
+	case 14235, 14236, 8888, 8889, 8890, 11503, 18650, 1314, 9999, 12345, 54321, 48899, 9527:
+		return true
+	}
+	return false
+}
+
 func (a *App) emit(event string, data ...any) {
 	if a.ctx != nil {
 		runtime.EventsEmit(a.ctx, event, data...)
@@ -185,6 +218,7 @@ func (a *App) StartSession(can string, rack int) State {
 	path := a.pathFor(can, rack)
 	if existing, err := walk.Load(path); err == nil {
 		a.session = existing
+		a.walking = true
 		a.lastReport = map[string]time.Time{}
 		return a.stateLocked("")
 	}
@@ -194,19 +228,22 @@ func (a *App) StartSession(can string, rack int) State {
 		return a.stateLocked(err.Error())
 	}
 	a.session = s
+	a.walking = true
 	a.lastReport = map[string]time.Time{}
 	a.save()
 	return a.stateLocked("")
 }
 
-// StopSession ends the walk and leaves the saved file alone, so the same rack
-// can be resumed later.
+// StopSession ends the walk but keeps the rack in hand.
+//
+// The session deliberately survives: exporting is something you do once the
+// walking is finished, and clearing it here would mean stopping and exporting
+// were mutually exclusive.
 func (a *App) StopSession() State {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	a.walking = false
 	a.save()
-	a.session = nil
-	a.lastReport = map[string]time.Time{}
 	return a.stateLocked("")
 }
 
@@ -340,7 +377,8 @@ type Row struct {
 
 // State is a complete snapshot of the walk for the frontend to render.
 type State struct {
-	Active     bool   `json:"active"`
+	Active     bool   `json:"active"`     // a walk is in progress
+	HasSession bool   `json:"hasSession"` // a rack is loaded, walking or not
 	Can        string `json:"can"`
 	Rack       int    `json:"rack"`
 	Rows       int    `json:"rows"`
@@ -372,7 +410,8 @@ func (a *App) stateLocked(errMsg string) State {
 	}
 	s := a.session
 
-	st.Active = true
+	st.Active = a.walking
+	st.HasSession = true
 	st.Can = s.Can
 	st.Rack = s.Rack
 	st.Rows = s.Geom.Rows

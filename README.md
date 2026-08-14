@@ -65,7 +65,8 @@ Worth it only if this gets handed to people who should not have to be told.
 3. Press **Space** at an empty slot, a switch, or a machine that will not
    report. The position is held open, which is what keeps everything after it
    aligned.
-4. Press **Export CSV** at the end of the rack.
+4. Press **Stop** at the end of the rack, then **Export CSV**. Stopping keeps
+   the rack on screen — it ends the walk, it does not discard it.
 
 The **Row** and **Column** boxes show where the next machine will land. If you
 are off by one, type the right numbers in — the walk moves, nothing already
@@ -83,6 +84,7 @@ recorded is touched, and the rest of the rack follows on from there.
 | <kbd>I</kbd> | Insert a blank above it (everything below shifts down) |
 | <kbd>Del</kbd> | Delete it (everything below shifts up) |
 | <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd> | Undo / redo |
+| <kbd>Ctrl</kbd>+<kbd>E</kbd> | Export (once stopped) |
 
 Right-clicking a row does the same things, if your hands are already on the
 mouse.
@@ -185,11 +187,19 @@ received is always written to disk in full.
 
 ## Supported miners
 
-| Type | Status |
-|---|---|
-| **Antminer** | Working. `IP,MAC` as plain ASCII on udp/14235, sent from udp/14236. |
-| **Whatsminer** | Not yet. Their own tool can do it, so the miners emit something — it needs a capture to find. |
-| **Avalon, SealMiner** | Not yet. Opportunistic. |
+| Type | Port | Payload | Status |
+|---|---|---|---|
+| **Antminer** | udp/14235 | `10.0.0.5,aa:bb:cc:dd:ee:ff` | Working |
+| **Whatsminer** | udp/8888 | `IP:10.0.0.5MAC:aa:bb:cc:dd:ee:ff` | Working |
+| Avalon, SealMiner | — | — | Not yet |
+
+> **Whatsminer's button must be held for more than five seconds.** A short
+> press does nothing at all — no broadcast is sent. Hold it until the two
+> right-hand LEDs flash. This is the single most likely reason a Whatsminer
+> appears not to report.
+
+Both vendors are heard by the same listener at the same time, so a mixed can
+is one walk rather than two tools.
 
 Adding a vendor is a new file in `internal/parse`, not a change to anything
 that already works.

@@ -32,7 +32,11 @@ var DefaultPorts = []int{
 	4028, 4029, 4030, // cgminer & bmminer API family (TCP normally, UDP seen)
 	4433, 4444,
 	3333, 3334, // stratum-adjacent
-	8888, 8889, 8890, // very common MicroBT / WhatsMinerTool candidates
+	8888,       // Whatsminer / MicroBT. Confirmed.
+	8889, 8890, // neighbours, in case a firmware revision differs
+	11503, // IceRiver
+	18650, // SealMiner
+	54321, // iPollo
 	9999, 9998, 9997,
 	9527,  // widespread Chinese-vendor device discovery port
 	34952, // seen in embedded miner control planes
