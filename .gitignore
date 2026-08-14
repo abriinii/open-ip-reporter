@@ -24,8 +24,12 @@ sessions/
 # ---------------------------------------------------------------------------
 # Build output
 # ---------------------------------------------------------------------------
-dist/
+# Leading slash matters here too: a bare "dist/" matches at any depth and
+# would silently swallow gui/frontend/dist, which is the application's UI and
+# has to be committed for the build to embed it.
+/dist/
 build/
+gui/build/
 # Leading slash matters: a bare "ipreporter" would also match the
 # cmd/ipreporter source directory and silently drop it from the repo.
 /ipreporter
@@ -49,3 +53,7 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+
+# Stray binaries from "go build ./..." inside the app module.
+/gui/gui
+/gui/gui.exe

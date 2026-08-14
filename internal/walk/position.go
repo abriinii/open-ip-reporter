@@ -64,6 +64,12 @@ func (p Position) String() string {
 	return fmt.Sprintf("%s R%d C%d/%d", p.Can, p.Rack, p.Column, p.Row)
 }
 
+// Short is the column/row alone, for when the can and rack are already on
+// screen and repeating them is noise.
+func (p Position) Short() string {
+	return fmt.Sprintf("C%d/%d", p.Column, p.Row)
+}
+
 // Valid reports whether a position falls inside a rack of the given shape.
 func (p Position) Valid(g Geometry) bool {
 	return p.Can != "" && p.Rack > 0 &&

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "BetterIPReporter",
+  "outputfilename": "BetterIPReporter",
+  "frontend:install": "",
+  "frontend:build": "",
+  "frontend:dev:watcher": "",
+  "wailsjsdir": "./frontend",
+  "author": {
+    "name": "Alex Brinager"
+  },
+  "info": {
+    "productName": "BetterIPReporter",
+    "comments": "Miner IP reporter that records physical rack position with every capture"
+  }
+}

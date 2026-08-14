@@ -215,6 +215,49 @@ func Run(opts Options, stop <-chan struct{}) error {
 	return nil
 }
 
+// Listen binds ports and hands every datagram to onPacket until stop is
+// closed. It is the same receive path as Run without the file writing, for
+// callers that want to react to reports live rather than review them later.
+//
+// onPacket is called from a single goroutine, so it does not need to be safe
+// for concurrent use, but it must not block for long: everything else is
+// waiting behind it.
+func Listen(ports []int, onPacket func(Packet), stop <-chan struct{}) (bound int, err error) {
+	raiseFDLimit()
+
+	conns, _ := bindAll(ports)
+	if len(conns) == 0 {
+		return 0, fmt.Errorf("could not bind any of the %d requested ports", len(ports))
+	}
+
+	packets := make(chan Packet, 256)
+	var readers sync.WaitGroup
+	for _, c := range conns {
+		readers.Add(1)
+		go func(c *net.UDPConn) {
+			defer readers.Done()
+			readLoop(c, packets)
+		}(c)
+	}
+
+	go func() {
+		<-stop
+		for _, c := range conns {
+			c.Close()
+		}
+		readers.Wait()
+		close(packets)
+	}()
+
+	go func() {
+		for p := range packets {
+			onPacket(p)
+		}
+	}()
+
+	return len(conns), nil
+}
+
 // bindAll opens one UDP socket per port on 0.0.0.0, which is what receives
 // both subnet broadcasts and 255.255.255.255. Returns the sockets that opened
 // and a description of each that did not.

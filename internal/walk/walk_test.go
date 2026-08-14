@@ -1,6 +1,7 @@
 package walk
 
 import (
+	"errors"
 	"path/filepath"
 	"testing"
 	"time"
@@ -196,21 +197,61 @@ func TestSetMACValidatesAndConvertsKind(t *testing.T) {
 	}
 }
 
-// Duplicate detection must be blind to formatting, or it misses the case it
-// exists for.
-func TestDuplicatesIgnoreMACFormatting(t *testing.T) {
+// A duplicate is refused outright rather than recorded. Writing it would
+// consume a position belonging to a real machine and shift the rest of the
+// rack by one.
+func TestRecordRefusesADuplicate(t *testing.T) {
 	s := newTestSession(t, b1)
 	s.Record("02:81:f5:ea:e1:db", "", "Antminer", time.Now())
 	s.Record("02:00:00:00:00:99", "", "Antminer", time.Now())
-	s.Record("02-81-F5-EA-E1-DB", "", "Antminer", time.Now()) // same machine, typed differently
 
-	dupes := s.Duplicates()
-	if len(dupes) != 1 {
-		t.Fatalf("found %d duplicate MACs, want 1: %v", len(dupes), dupes)
+	// Same machine, typed differently: still the same machine.
+	_, err := s.Record("02-81-F5-EA-E1-DB", "", "Antminer", time.Now())
+	if err == nil {
+		t.Fatal("a duplicate MAC was recorded, want refusal")
 	}
-	idx := dupes["02:81:f5:ea:e1:db"]
-	if len(idx) != 2 || idx[0] != 0 || idx[1] != 2 {
-		t.Errorf("duplicate at %v, want positions 0 and 2", idx)
+	var dup *DuplicateError
+	if !errors.As(err, &dup) {
+		t.Fatalf("got %T, want *DuplicateError", err)
+	}
+	if dup.Index != 0 || dup.Position.Row != 1 || dup.Position.Column != 1 {
+		t.Errorf("reported existing entry at index %d %v, want index 0 at C1/1", dup.Index, dup.Position)
+	}
+
+	if len(s.Entries) != 2 {
+		t.Errorf("rack holds %d entries, want 2 — the refused one must not consume a position", len(s.Entries))
+	}
+	if d := s.Duplicates(); len(d) != 0 {
+		t.Errorf("duplicates present after refusal: %v", d)
+	}
+}
+
+// Refusing must not cost an undo step either, or undo would silently become
+// "undo the thing before the thing you just tried".
+func TestRefusedDuplicateLeavesNoUndoStep(t *testing.T) {
+	s := newTestSession(t, b1)
+	s.Record("02:81:f5:ea:e1:db", "", "Antminer", time.Now())
+	before := len(s.undo)
+	s.Record("02:81:f5:ea:e1:db", "", "Antminer", time.Now())
+	if len(s.undo) != before {
+		t.Errorf("undo depth went %d -> %d on a refused record, want unchanged", before, len(s.undo))
+	}
+}
+
+func TestSetMACRefusesAMACAlreadyInTheRack(t *testing.T) {
+	s := newTestSession(t, b1)
+	s.Record("02:81:f5:ea:e1:db", "", "Antminer", time.Now())
+	s.Skip()
+
+	if err := s.SetMAC(1, "02:81:F5:EA:E1:DB"); err == nil {
+		t.Fatal("typing in a MAC already in the rack was accepted, want refusal")
+	}
+	if s.Entries[1].Kind != Skipped {
+		t.Error("the refused edit changed the row anyway")
+	}
+	// Re-setting an entry to the MAC it already has is not a duplicate.
+	if err := s.SetMAC(0, "02:81:f5:ea:e1:db"); err != nil {
+		t.Errorf("setting an entry to its own MAC was refused: %v", err)
 	}
 }
 

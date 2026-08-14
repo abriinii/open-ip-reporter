@@ -4,7 +4,8 @@ name: Release
 #
 #     git tag v0.1.0 && git push origin v0.1.0
 #
-# That builds both binaries and attaches them to the Releases page.
+# That builds the command-line capture tool and the desktop app for both
+# platforms, and attaches them all to the Releases page.
 on:
   push:
     tags:
@@ -14,7 +15,9 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  # The command-line tool is pure Go with CGO disabled, so one Linux runner
+  # produces both binaries.
+  cli:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,9 +26,6 @@ jobs:
         with:
           go-version: stable
 
-      # The tool is pure Go with CGO disabled, so one Linux runner can produce
-      # both binaries. If a native GUI toolkit is added later this becomes a
-      # matrix across macos-14 and windows-latest.
       - name: Build binaries
         run: |
           mkdir -p dist
@@ -38,13 +38,73 @@ jobs:
             -o dist/ipreporter-windows-x64.exe ./cmd/ipreporter
           ls -lh dist/
 
-      - name: Checksums
-        run: cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli
+          path: dist/
+
+  # The desktop app embeds a system webview, which needs CGO, which means it
+  # cannot be cross-compiled. Each platform builds on its own runner.
+  app:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            platform: darwin/arm64
+            # Wails emits a .app bundle on macOS; zip it so the Releases page
+            # serves a single file that survives the download intact.
+            package: |
+              cd gui/build/bin
+              ditto -c -k --keepParent BetterIPReporter.app ../../../dist/BetterIPReporter-macos-arm64.zip
+          - os: windows-latest
+            platform: windows/amd64
+            package: |
+              mkdir -p dist
+              cp gui/build/bin/BetterIPReporter.exe dist/BetterIPReporter-windows-x64.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.14.0
+
+      - name: Build app
+        working-directory: gui
+        run: wails build -platform ${{ matrix.platform }} -ldflags "-X main.version=$GITHUB_REF_NAME"
+
+      - name: Package
+        shell: bash
+        run: ${{ matrix.package }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-${{ matrix.os }}
+          path: dist/
+
+  publish:
+    needs: [cli, app]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: staging
+
+      - name: Collect and checksum
+        run: |
+          mkdir -p dist
+          find staging -type f -exec cp {} dist/ \;
+          cd dist && sha256sum * > SHA256SUMS.txt && ls -lh && cat SHA256SUMS.txt
 
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$GITHUB_REF_NAME" dist/* \
+            --repo "$GITHUB_REPOSITORY" \
             --title "$GITHUB_REF_NAME" \
             --generate-notes

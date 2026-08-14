@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-// doubleFireWindow is how close two identical reports must be to count as one
+// DoubleFireWindow is how close two identical reports must be to count as one
 // press of the button.
 //
 // Antminers send every report twice, one second apart, by design. Treating the
@@ -23,7 +23,7 @@ import (
 // treating a genuinely repeated MAC as harmless would let a real duplicate
 // through. The window separates the two: inside it is one press, outside it is
 // a duplicate worth shouting about.
-const doubleFireWindow = 3 * time.Second
+const DoubleFireWindow = 3 * time.Second
 
 // Packet is a captured datagram, as recorded in a .jsonl capture file.
 type Packet struct {
@@ -117,7 +117,7 @@ func ParseFile(path string) ([]Report, Stats, error) {
 		stats.TotalPackets++
 		pkt := Packet{TS: ts, SrcIP: rec.SrcIP, SrcPort: rec.SrcPort, DstPort: rec.DstPort, Data: data}
 
-		rep, ok := decode(pkt)
+		rep, ok := Decode(pkt)
 		if !ok {
 			stats.Unparsed[rec.DstPort]++
 			continue
@@ -128,7 +128,7 @@ func ParseFile(path string) ([]Report, Stats, error) {
 
 		// Collapse the vendor's own repeat, but only inside the window.
 		if idx, seen := lastSeen[rep.MAC]; seen {
-			if ts.Sub(reports[idx].TS) <= doubleFireWindow {
+			if ts.Sub(reports[idx].TS) <= DoubleFireWindow {
 				reports[idx].Copies++
 				stats.Collapsed++
 				continue
@@ -161,7 +161,8 @@ func ParseFile(path string) ([]Report, Stats, error) {
 	return reports, stats, nil
 }
 
-func decode(p Packet) (*Report, bool) {
+// Decode tries every registered vendor handler and returns the first match.
+func Decode(p Packet) (*Report, bool) {
 	for _, h := range handlers {
 		if rep, ok := h.Parse(p); ok {
 			return rep, true

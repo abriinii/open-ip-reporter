@@ -108,15 +108,51 @@ func (s *Session) NextPosition() (Position, bool) {
 // Full reports whether the rack has as many entries as it has positions.
 func (s *Session) Full() bool { return len(s.Entries) >= s.Geom.Positions() }
 
-// Record appends a captured machine. Recording past the end of a rack is
-// allowed but reported, because the operator is the one who knows whether the
-// rack is genuinely longer than expected or whether a skip was missed.
-func (s *Session) Record(mac, ip, vendor string, ts time.Time) (Position, bool) {
+// DuplicateError reports an attempt to record a MAC the rack already holds,
+// and says where it already is so the operator can go and look.
+type DuplicateError struct {
+	MAC      string
+	Index    int
+	Position Position
+}
+
+func (e *DuplicateError) Error() string {
+	return fmt.Sprintf("%s is already recorded at %s", e.MAC, e.Position)
+}
+
+// Find returns the index of the entry holding a MAC.
+func (s *Session) Find(mac string) (int, bool) {
+	mac = normaliseMAC(mac)
+	if mac == "" {
+		return 0, false
+	}
+	for i, e := range s.Entries {
+		if e.Kind == Reported && e.MAC == mac {
+			return i, true
+		}
+	}
+	return 0, false
+}
+
+// Record appends a captured machine.
+//
+// A MAC already in this rack is refused outright rather than recorded and
+// flagged. A duplicate is never useful data: it is a double press, or a miner
+// heard from twice, and writing it would consume a position that belongs to a
+// real machine — shifting everything after it by one, which is the exact
+// corruption this tool exists to prevent. Refusing costs nothing, because the
+// operator can simply press the right miner next.
+func (s *Session) Record(mac, ip, vendor string, ts time.Time) (Position, error) {
+	if i, found := s.Find(mac); found {
+		at, _ := s.PositionOf(i)
+		return Position{}, &DuplicateError{MAC: normaliseMAC(mac), Index: i, Position: at}
+	}
 	s.snapshot()
 	s.Entries = append(s.Entries, Entry{
 		Kind: Reported, MAC: normaliseMAC(mac), IP: ip, Vendor: vendor, TS: ts,
 	})
-	return s.PositionOf(len(s.Entries) - 1)
+	p, _ := s.PositionOf(len(s.Entries) - 1)
+	return p, nil
 }
 
 // Skip records a deliberately empty position: an empty slot, a switch, or a
@@ -160,6 +196,12 @@ func (s *Session) SetMAC(i int, mac string) error {
 	mac = strings.TrimSpace(mac)
 	if mac != "" && !validMAC(mac) {
 		return fmt.Errorf("%q is not a MAC address", mac)
+	}
+	// Same rule as Record: one MAC, one position. Typing in a MAC that is
+	// already somewhere in the rack is the same mistake as capturing it twice.
+	if j, found := s.Find(mac); found && j != i {
+		at, _ := s.PositionOf(j)
+		return &DuplicateError{MAC: normaliseMAC(mac), Index: j, Position: at}
 	}
 	s.snapshot()
 	s.Entries[i].MAC = normaliseMAC(mac)

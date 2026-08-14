@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BetterIPReporter</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<div id="setup" class="setup">
+  <div class="setup-card">
+    <h1>BetterIPReporter</h1>
+    <div class="setup-row">
+      <label for="can">Can</label>
+      <select id="can"></select>
+    </div>
+    <div class="setup-row">
+      <label for="rack">Rack</label>
+      <input id="rack" type="number" min="1" max="20" value="1">
+    </div>
+    <button id="start" class="primary">Start</button>
+    <p id="setup-error" class="err"></p>
+  </div>
+</div>
+
+<div id="app" class="app hidden">
+
+  <header class="bar">
+    <span id="loc" class="loc">—</span>
+    <span id="count" class="count"></span>
+    <span class="spacer"></span>
+    <span id="listen-dot" class="dot"></span>
+    <button id="change" class="ghost">Change</button>
+  </header>
+
+  <section class="next">
+    <div id="next-pos" class="next-pos">—</div>
+  </section>
+
+  <div id="toast" class="toast"></div>
+
+  <section class="table-wrap">
+    <table>
+      <tbody id="rows"></tbody>
+    </table>
+    <div id="empty" class="empty">
+      Press a miner's button, or <kbd>Space</kbd> to skip an empty slot.
+    </div>
+  </section>
+
+  <footer class="keys">
+    <span><kbd>Space</kbd> skip</span>
+    <span><kbd>↑</kbd><kbd>↓</kbd> pick row</span>
+    <span><kbd>Enter</kbd> edit</span>
+    <span><kbd>Del</kbd> remove</span>
+    <span><kbd>Ctrl</kbd>+<kbd>Z</kbd> undo</span>
+    <span id="more-keys" class="more">more…</span>
+  </footer>
+</div>
+
+<script src="/wails/runtime.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -31,3 +31,29 @@ jobs:
             CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" go build ./...
             echo "::endgroup::"
           done
+
+  # The desktop app is a separate module: it needs CGO for the system webview,
+  # so it cannot be checked by the cross-compile job above. Its tests cover the
+  # capture-to-position wiring and run without opening a window.
+  app:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+
+      - name: Test and vet the app
+        working-directory: gui
+        run: |
+          go vet ./...
+          go test ./...
+
+      # The frontend is committed, not built, so a missing file here is a
+      # broken release rather than a broken build. Fail loudly instead.
+      - name: Check the embedded frontend is present
+        run: |
+          for f in gui/frontend/dist/index.html gui/frontend/dist/app.css gui/frontend/dist/app.js; do
+            test -s "$f" || { echo "::error::$f is missing or empty — the app would ship with no UI"; exit 1; }
+          done
