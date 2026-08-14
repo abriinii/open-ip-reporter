@@ -29,11 +29,6 @@ function render(s) {
   }
   $("can").disabled = s.active;
   $("rack").disabled = s.active;
-  // The shape of a rack is fixed once a walk begins: changing it underneath
-  // recorded rows would move machines that are already placed.
-  $("geom-rows").disabled = s.active;
-  $("geom-cols").disabled = s.active;
-  if (s.active) { $("geom-rows").value = s.rows; $("geom-cols").value = s.columns; }
   $("row").disabled = !s.active;
   $("column").disabled = !s.active;
 
@@ -76,7 +71,8 @@ function renderRows(s) {
       `<td class="no">${i + 1}</td><td class="pos">${e.row}</td><td class="pos">${e.column}</td>` +
       (e.kind === "skipped"
         ? `<td class="skip" colspan="2">skipped</td>`
-        : `<td class="mono">${esc(e.ip)}</td><td class="mono">${esc(e.mac)}</td>`);
+        : `<td class="mono">${esc(e.ip)}</td><td class="mono">${esc(e.mac)}</td>`) +
+      `<td class="note" title="${esc(e.note)}">${esc(e.note)}</td>`;
     body.appendChild(tr);
   });
 
@@ -134,6 +130,7 @@ $("ctx").onclick = async (ev) => {
   switch (act) {
     case "mac": await editMAC(selected); break;
     case "pos": await editRowPosition(selected); break;
+    case "note": await editNote(selected); break;
     case "insert": render(await go().InsertBlankAbove(selected)); break;
     case "delete": await deleteRow(); break;
   }
@@ -173,7 +170,7 @@ for (const id of ["row", "column"]) {
     if (ev.key === "Enter") { ev.preventDefault(); $(id).blur(); }
   });
 }
-for (const id of ["rack", "can", "geom-rows", "geom-cols"]) {
+for (const id of ["rack", "can"]) {
   $(id).addEventListener("focus", () => { editing = true; });
   $(id).addEventListener("blur", () => { editing = false; });
 }
@@ -218,6 +215,10 @@ document.addEventListener("keydown", async (ev) => {
       if (selected >= 0) { ev.preventDefault(); render(await go().InsertBlankAbove(selected)); }
       break;
 
+    case "n": case "N":
+      if (selected >= 0) { ev.preventDefault(); await editNote(selected); }
+      break;
+
     case "p": case "P":
       if (selected >= 0) { ev.preventDefault(); await editRowPosition(selected); }
       break;
@@ -249,6 +250,18 @@ async function editMAC(i) {
     const val = window.prompt("MAC address for this position (empty = skipped):", cur);
     if (val === null) return;
     render(await go().SetMAC(i, val.trim()));
+  } finally { editing = false; }
+}
+
+async function editNote(i) {
+  editing = true;
+  try {
+    const cur = state.entries[i]?.note ?? "";
+    const val = window.prompt(
+      "Note for this position — why it was skipped, or anything worth\n" +
+      "finding again later. It is saved with the exported CSV.", cur);
+    if (val === null) return;
+    render(await go().SetNote(i, val));
   } finally { editing = false; }
 }
 
@@ -286,21 +299,13 @@ async function boot() {
     if (!Number.isFinite(rack) || rack < 1) { hint("rack must be 1 or higher", true); return; }
     selected = -1;
     lastCount = 0;
-    const rows = parseInt($("geom-rows").value, 10);
-    const cols = parseInt($("geom-cols").value, 10);
-    const s = await go().StartSession(sel.value, rack, rows, cols);
+    const s = await go().StartSession(sel.value, rack);
     render(s);
     if (!s.error) {
       const row = parseInt($("row").value, 10);
       const col = parseInt($("column").value, 10);
       if (row > 1 || col > 1) render(await go().SetNextPosition(col, row));
     }
-  };
-
-  // Prefill the size boxes from the can's usual shape, but leave them editable.
-  sel.onchange = async () => {
-    const g = await go().GeometryFor(sel.value);
-    if (g && g.Rows) { $("geom-rows").value = g.Rows; $("geom-cols").value = g.Columns; }
   };
 
   runtime.EventsOn("captured", async () => render(await go().State()));

@@ -170,33 +170,16 @@ func (a *App) Cans() []string {
 	return cans
 }
 
-// GeometryFor reports the usual shape of a can's racks, for prefilling the
-// size boxes. The operator can still override it.
-func (a *App) GeometryFor(can string) walk.Geometry {
-	g, _ := walk.DefaultGeometry(can)
-	return g
-}
-
 // StartSession begins a walk, resuming a saved one for the same rack if there
 // is one. Resuming rather than overwriting is the whole point of persistence:
 // a closed lid mid-rack must not cost the walk.
-func (a *App) StartSession(can string, rack, rows, columns int) State {
+func (a *App) StartSession(can string, rack int) State {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
 	g, ok := walk.DefaultGeometry(can)
 	if !ok {
 		return a.stateLocked(fmt.Sprintf("%s is not a can that can be walked", can))
-	}
-	// Whatever the operator typed wins over the default: they are looking at
-	// the rack and the default is only a starting point.
-	if rows > 0 && columns > 0 {
-		g = walk.Geometry{Rows: rows, Columns: columns}
-	}
-	if !g.Valid() {
-		return a.stateLocked(fmt.Sprintf(
-			"%d rows x %d columns is %d positions; no rack here holds more than %d",
-			g.Rows, g.Columns, g.Rows*g.Columns, walk.MaxPositions))
 	}
 
 	path := a.pathFor(can, rack)
@@ -261,6 +244,12 @@ func (a *App) SetNextPosition(column, row int) State {
 	return a.mutate(func(s *walk.Session) error {
 		return s.SetNextPosition(walk.Position{Can: s.Can, Rack: s.Rack, Column: column, Row: row})
 	})
+}
+
+// SetNote attaches free text to a position — why a slot was skipped, a machine
+// that would not report, anything worth finding again later.
+func (a *App) SetNote(i int, note string) State {
+	return a.mutate(func(s *walk.Session) error { return s.SetNote(i, note) })
 }
 
 func (a *App) SetPosition(i, column, row int) State {
@@ -346,6 +335,7 @@ type Row struct {
 	Row    int    `json:"row"`
 	Label  string `json:"label"`
 	Time   string `json:"time"`
+	Note   string `json:"note"`
 }
 
 // State is a complete snapshot of the walk for the frontend to render.
@@ -408,6 +398,7 @@ func (a *App) stateLocked(errMsg string) State {
 			Row:    p.Row,
 			Label:  p.Short(),
 			Time:   ts,
+			Note:   e.Note,
 		})
 	}
 

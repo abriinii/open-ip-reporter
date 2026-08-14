@@ -248,6 +248,31 @@ func (s *Session) SetMAC(i int, mac string) error {
 	return nil
 }
 
+// SetNote attaches free text to a position: why a slot was skipped, a machine
+// that would not report, anything the operator wants to find again later.
+//
+// A note is allowed on any position, including a skipped one — that is the
+// main case it exists for.
+func (s *Session) SetNote(i int, note string) error {
+	if i < 0 || i >= len(s.Entries) {
+		return fmt.Errorf("no entry at %d", i)
+	}
+	s.snapshot()
+	s.Entries[i].Note = strings.TrimSpace(note)
+	return nil
+}
+
+// HasNotes reports whether anything in this rack carries a note. The export
+// uses it to decide whether a notes column belongs in the file at all.
+func (s *Session) HasNotes() bool {
+	for _, e := range s.Entries {
+		if e.Note != "" {
+			return true
+		}
+	}
+	return false
+}
+
 // SetPosition pins an entry to a position. Everything after it renumbers to
 // follow, so correcting one row corrects the remainder of the rack.
 func (s *Session) SetPosition(i int, p Position) error {

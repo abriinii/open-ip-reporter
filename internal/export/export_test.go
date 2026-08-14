@@ -1,6 +1,7 @@
 package export
 
 import (
+	"encoding/csv"
 	"os"
 	"path/filepath"
 	"strings"
@@ -163,5 +164,87 @@ func TestWriteFileLeavesTheOldFileWhenExportFails(t *testing.T) {
 	entries, _ := filepath.Glob(filepath.Join(dir, "*"))
 	if len(entries) != 1 {
 		t.Errorf("directory holds %v, want only the untouched export", entries)
+	}
+}
+
+// A rack with no notes must produce exactly the file the existing process
+// already reads. The notes column is not worth changing every file downstream
+// for a field that is usually blank.
+func TestNoNotesMeansNoNotesColumn(t *testing.T) {
+	s := newSession(t)
+	s.Record("02:81:f5:ea:e1:db", "21.1.1.43", "Antminer", time.Now())
+	s.Skip()
+
+	want := "21.1.1.43,02:81:f5:ea:e1:db\n,\n"
+	if got := positional(t, s); got != want {
+		t.Errorf("export:\n%q\nwant unchanged two-column form:\n%q", got, want)
+	}
+}
+
+// One note anywhere in the rack adds the column to every row of that file, so
+// the file stays internally rectangular.
+func TestOneNoteAddsTheColumnToEveryRow(t *testing.T) {
+	s := newSession(t)
+	s.Record("02:81:f5:ea:e1:db", "21.1.1.43", "Antminer", time.Now())
+	s.Skip()
+	s.Record("02:ad:af:02:ff:45", "21.1.11.232", "Antminer", time.Now())
+	if err := s.SetNote(1, "wont ip report"); err != nil {
+		t.Fatal(err)
+	}
+
+	want := "21.1.1.43,02:81:f5:ea:e1:db,\n" +
+		",,wont ip report\n" +
+		"21.1.11.232,02:ad:af:02:ff:45,\n"
+	if got := positional(t, s); got != want {
+		t.Errorf("export:\n%q\nwant:\n%q", got, want)
+	}
+}
+
+// A note with a comma or a quote in it must not break the row it sits on.
+func TestNotesAreQuotedWhenTheyNeedToBe(t *testing.T) {
+	s := newSession(t)
+	s.Skip()
+	s.SetNote(0, `dead PSU, "swapped" 3rd shift`)
+
+	got := positional(t, s)
+	want := ",,\"dead PSU, \"\"swapped\"\" 3rd shift\"\n"
+	if got != want {
+		t.Errorf("export:\n%q\nwant:\n%q", got, want)
+	}
+	// And it must read back as one field, not three.
+	r := csv.NewReader(strings.NewReader(got))
+	rec, err := r.Read()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rec) != 3 || rec[2] != `dead PSU, "swapped" 3rd shift` {
+		t.Errorf("round-tripped as %q", rec)
+	}
+}
+
+// A gap left by jumping the walk has no entry at all, so its note cell must
+// still be written rather than producing a short row.
+func TestGapRowsGetANoteCellToo(t *testing.T) {
+	s := newSession(t)
+	s.Record("02:00:00:00:00:01", "21.1.1.1", "Antminer", time.Now())
+	s.SetNextPosition(walk.Position{Can: "B1", Rack: 3, Column: 1, Row: 3})
+	s.Record("02:00:00:00:00:02", "21.1.1.2", "Antminer", time.Now())
+	s.SetNote(1, "moved up a row")
+
+	r := csv.NewReader(strings.NewReader(positional(t, s)))
+	recs, err := r.ReadAll()
+	if err != nil {
+		t.Fatalf("export is not rectangular: %v", err)
+	}
+	if len(recs) != 3 {
+		t.Fatalf("got %d rows, want 3", len(recs))
+	}
+	for i, rec := range recs {
+		if len(rec) != 3 {
+			t.Errorf("row %d has %d fields, want 3", i+1, len(rec))
+		}
+	}
+	if recs[2][2] != "moved up a row" {
+		t.Errorf("note landed on row %q", recs[2])
 	}
 }

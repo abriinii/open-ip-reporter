@@ -31,17 +31,31 @@ func Positional(w io.Writer, s *walk.Session) error {
 		return err
 	}
 
+	// The notes column appears only when the rack actually has notes, so a
+	// walk with none produces exactly the two-column file the existing process
+	// already reads. Adding a column unconditionally would change every file
+	// downstream for the sake of a field usually left blank.
+	notes := s.HasNotes()
+
 	cw := csv.NewWriter(w)
 	for _, e := range rows {
-		if e == nil || e.Kind != walk.Reported {
-			// A blank row holds the position open, exactly as the Skip button
-			// does in the tool this replaces.
-			if err := cw.Write([]string{"", ""}); err != nil {
-				return err
-			}
-			continue
+		var rec []string
+		switch {
+		case e == nil:
+			rec = []string{"", ""} // a position nothing was recorded at
+		case e.Kind != walk.Reported:
+			rec = []string{"", ""} // a skip: blank, but it may carry a note
+		default:
+			rec = []string{e.IP, e.MAC}
 		}
-		if err := cw.Write([]string{e.IP, e.MAC}); err != nil {
+		if notes {
+			note := ""
+			if e != nil {
+				note = e.Note
+			}
+			rec = append(rec, note)
+		}
+		if err := cw.Write(rec); err != nil {
 			return err
 		}
 	}

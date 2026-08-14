@@ -21,14 +21,6 @@
       <label for="rack">Rack</label>
       <input id="rack" type="number" min="1" max="20" value="1">
     </div>
-    <div class="field size">
-      <label for="geom-rows">Rack size</label>
-      <div class="size-pair">
-        <input id="geom-rows" type="number" min="1" max="50" value="10" title="rows">
-        <span class="times">&times;</span>
-        <input id="geom-cols" type="number" min="1" max="50" value="5" title="columns">
-      </div>
-    </div>
     <div class="field narrow">
       <label for="row">Row</label>
       <input id="row" type="number" min="1" value="1">
@@ -64,7 +56,8 @@
             <th class="c-rc">Row</th>
             <th class="c-rc">Column</th>
             <th class="c-ip">IP Address</th>
-            <th>MAC Address</th>
+            <th class="c-mac">MAC Address</th>
+            <th>Notes</th>
           </tr>
         </thead>
         <tbody id="rows"></tbody>
@@ -83,6 +76,7 @@
 <div id="ctx" class="menu hidden">
   <button data-act="mac">Edit MAC address…</button>
   <button data-act="pos">Set position…</button>
+  <button data-act="note">Edit note…</button>
   <div class="menu-sep"></div>
   <button data-act="insert">Insert blank above</button>
   <button data-act="delete">Delete row</button>
