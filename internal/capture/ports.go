@@ -63,17 +63,34 @@ var DefaultPorts = []int{
 	5678, 5679,
 	1314, 1315, // "IP report" ports in some rebadged firmware
 
-	// --- Standard protocols ---
-	// Not miner IP-report traffic, but genuinely useful: a miner that just
-	// powered up will DHCP, and mDNS/NetBIOS/SSDP often carry the hostname
-	// and MAC. If the vendor broadcast is a dead end, these are a second way
-	// to see the machine announce itself.
+}
+
+// InfrastructurePorts are deliberately NOT in the default list.
+//
+// A miner that just powered up does speak DHCP, and mDNS/NetBIOS/SSDP can
+// carry a hostname and MAC, so these looked like a useful second channel. They
+// are not worth it by default:
+//
+//   - They are operating-system services. Binding them is the only part of
+//     this tool that could contend with something real on the same PC — for
+//     unicast traffic a shared socket can divert packets from another local
+//     program. Broadcast traffic is copied to every listener, so the ports
+//     that actually matter here are unaffected either way.
+//   - Below 1024 they need admin rights and simply fail to bind otherwise.
+//   - They are by far the loudest source of noise in a capture.
+//
+// None of that is worth paying for a channel we do not need: miners announce
+// themselves on their vendor port, which is what we are here for. Available
+// deliberately when a capture comes up empty and it is worth casting wider:
+//
+//	ipreporter capture -add 67,68,137,138,1900,5353
+var InfrastructurePorts = []int{
 	67, 68, // DHCP server / client
-	5353,     // mDNS
-	1900,     // SSDP
+	123,      // NTP
 	137, 138, // NetBIOS name / datagram
 	161,  // SNMP
-	123,  // NTP
+	1900, // SSDP
+	5353, // mDNS / Bonjour
 	5355, // LLMNR
 }
 
