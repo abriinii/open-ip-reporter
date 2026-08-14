@@ -48,13 +48,14 @@ type Packet struct {
 // jsonRecord is the machine-readable form written to the .jsonl file, one per
 // line. This is the file that matters for building parsers later.
 type jsonRecord struct {
-	TS      string `json:"ts"`
-	SrcIP   string `json:"src_ip"`
-	SrcPort int    `json:"src_port"`
-	DstPort int    `json:"dst_port"`
-	Len     int    `json:"len"`
-	Hex     string `json:"hex"`
-	ASCII   string `json:"ascii"`
+	TS       string `json:"ts"`
+	SrcIP    string `json:"src_ip"`
+	SrcPort  int    `json:"src_port"`
+	DstPort  int    `json:"dst_port"`
+	Len      int    `json:"len"`
+	Hex      string `json:"hex"`
+	ASCII    string `json:"ascii"`
+	CanGuess string `json:"can_guess,omitempty"` // inferred, never authoritative
 }
 
 // Run binds every port in opts.Ports and records traffic until the returned
@@ -125,7 +126,7 @@ func Run(opts Options, stop <-chan struct{}) error {
 	// One writer goroutine owns both files, so no locking is needed and the
 	// two files stay in the same order.
 	counts := map[int]int{}
-	sources := map[string]bool{}
+	sources := map[string]int{}
 	repeats := map[string]int{}
 	total, hidden := 0, 0
 	done := make(chan struct{})
@@ -135,17 +136,18 @@ func Run(opts Options, stop <-chan struct{}) error {
 		for p := range packets {
 			total++
 			counts[p.DstPort]++
-			sources[p.SrcIP] = true
+			sources[p.SrcIP]++
 			hexStr := hex.EncodeToString(p.Data)
 
 			enc.Encode(jsonRecord{
-				TS:      p.TS.Format(time.RFC3339Nano),
-				SrcIP:   p.SrcIP,
-				SrcPort: p.SrcPort,
-				DstPort: p.DstPort,
-				Len:     len(p.Data),
-				Hex:     hexStr,
-				ASCII:   printableASCII(p.Data),
+				TS:       p.TS.Format(time.RFC3339Nano),
+				SrcIP:    p.SrcIP,
+				SrcPort:  p.SrcPort,
+				DstPort:  p.DstPort,
+				Len:      len(p.Data),
+				Hex:      hexStr,
+				ASCII:    printableASCII(p.Data),
+				CanGuess: DeriveCan(p.SrcIP),
 			})
 			jsonlFile.Sync() // flush every packet: a crash must not lose the walk
 
@@ -274,8 +276,12 @@ func portOf(conns []*net.UDPConn, want int) bool {
 func formatPacket(n int, p Packet) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "\n#%d  %s\n", n, p.TS.Format("15:04:05.000"))
-	fmt.Fprintf(&b, "  from %s:%d  ->  udp/%d   (%d bytes)\n",
-		p.SrcIP, p.SrcPort, p.DstPort, len(p.Data))
+	can := ""
+	if c := DeriveCan(p.SrcIP); c != "" {
+		can = "   can " + c + "?"
+	}
+	fmt.Fprintf(&b, "  from %s:%d  ->  udp/%d   (%d bytes)%s\n",
+		p.SrcIP, p.SrcPort, p.DstPort, len(p.Data), can)
 	fmt.Fprintf(&b, "  ascii: %s\n", printableASCII(p.Data))
 	for _, line := range strings.Split(strings.TrimRight(hex.Dump(p.Data), "\n"), "\n") {
 		fmt.Fprintf(&b, "  %s\n", line)
@@ -298,7 +304,7 @@ var knownPorts = map[int]string{
 	123:   "NTP (background)",
 }
 
-func formatSummary(total, hidden int, counts map[int]int, sources map[string]bool, bindErrs []string) string {
+func formatSummary(total, hidden int, counts map[int]int, sources map[string]int, bindErrs []string) string {
 	var b strings.Builder
 	b.WriteString("\n" + strings.Repeat("─", 72) + "\n")
 	fmt.Fprintf(&b, "\n  SUMMARY\n\n  %d packets from %d distinct source addresses.\n",
@@ -323,6 +329,8 @@ func formatSummary(total, hidden int, counts map[int]int, sources map[string]boo
 			fmt.Fprintf(&b, "    udp/%-6d %5d   %s\n", p, counts[p], label)
 		}
 	}
+
+	b.WriteString(formatCanTable(sources))
 
 	if len(bindErrs) > 0 {
 		b.WriteString("\n  Ports that could not be bound (informational):\n")

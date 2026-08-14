@@ -153,6 +153,31 @@ to disk in full**, no matter what the screen shows. The end-of-run summary
 labels each port so infrastructure chatter is easy to tell apart from a port
 worth investigating.
 
+### Can inference from the source IP
+
+The site puts each can on its own address range, with the first octet encoding
+the can name — `1x` for A, `2x` for B, `3x` for O. So `15.4.9.113` is a machine
+in **A5**.
+
+The capture labels every packet with the can its address implies, and groups
+the sources by can in the end-of-run summary:
+
+```
+  Sources grouped by can (inferred from the first octet):
+    A5      15 packets   15.1.1.254, 15.4.9.113, 15.4.9.114, 15.4.9.115
+    B2      12 packets   22.1.1.254
+    ?       12 packets   192.168.1.1
+```
+
+This matters for v1: it means **the can does not have to be typed in**. It
+comes off the wire with every report, which removes a whole category of
+mistake — tagging an entire rack with the wrong can because a field never got
+changed on the walk between them.
+
+It is labelled `can_guess` in the data and always sits next to the raw source
+IP. Anything that does not fit the scheme gets no label rather than a wrong
+one, so this degrades to harmless on a site addressed differently.
+
 ### Other notes on reading a capture
 - **A few ports failing to bind is normal.** "address already in use" means
   another program holds it; "permission denied" means it is below 1024 and
