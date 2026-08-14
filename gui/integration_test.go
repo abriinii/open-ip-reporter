@@ -14,6 +14,11 @@ import (
 	"openipreporter/internal/parse"
 )
 
+// testAddr binds loopback rather than every interface. The real application
+// may well be running on this machine holding these ports on 0.0.0.0, and
+// SO_REUSEPORT would otherwise load-balance the test's own datagrams into it.
+const testAddr = "127.0.0.1"
+
 // TestRealSocketToCSV drives the whole chain the way a walk does: a real UDP
 // datagram on a real socket, through the parser, into a session, and out to a
 // file on disk.
@@ -27,16 +32,18 @@ func TestRealSocketToCSV(t *testing.T) {
 	a.StartSession("B1", 3)
 
 	stop := make(chan struct{})
-	defer close(stop)
-
 	received := make(chan struct{}, 16)
-	bound, err := capture.Listen([]int{parse.AntminerPort}, func(p capture.Packet) {
+	bound, listenDone, err := capture.ListenOn(testAddr, []int{parse.AntminerPort}, func(p capture.Packet) {
 		a.onPacket(p)
 		received <- struct{}{}
 	}, stop)
 	if err != nil {
 		t.Fatalf("could not bind udp/%d: %v", parse.AntminerPort, err)
 	}
+	// Wait for a full teardown, not just a request to stop. These sockets use
+	// SO_REUSEPORT, so a later test binding the same port while these are still
+	// open would have its packets load-balanced into a closing socket.
+	t.Cleanup(func() { close(stop); <-listenDone })
 	if bound != 1 {
 		t.Fatalf("bound %d sockets, want 1", bound)
 	}
@@ -128,16 +135,17 @@ func TestBothVendorsLandInOneRack(t *testing.T) {
 	a.StartSession("B2", 1)
 
 	stop := make(chan struct{})
-	defer close(stop)
-
 	got := make(chan struct{}, 8)
-	if _, err := capture.Listen(
+	_, listenDone, err := capture.ListenOn(
+		testAddr,
 		[]int{parse.AntminerPort, parse.WhatsminerPort},
 		func(p capture.Packet) { a.onPacket(p); got <- struct{}{} },
 		stop,
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatalf("bind: %v", err)
 	}
+	t.Cleanup(func() { close(stop); <-listenDone })
 
 	send := func(port int, payload string) {
 		t.Helper()

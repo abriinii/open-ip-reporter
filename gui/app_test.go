@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -265,5 +266,56 @@ func TestNoteIsUndoable(t *testing.T) {
 	a.SetNote(0, "dead PSU")
 	if st := a.Undo(); st.Entries[0].Note != "" {
 		t.Errorf("after undo note is %q, want empty", st.Entries[0].Note)
+	}
+}
+
+// Copying reads from the session rather than from whatever the window last
+// rendered, so what lands on the clipboard is what was actually recorded.
+func TestCopyIPAndMAC(t *testing.T) {
+	var clipboard string
+	orig := setClipboard
+	setClipboard = func(_ context.Context, s string) error { clipboard = s; return nil }
+	defer func() { setClipboard = orig }()
+
+	a := newTestApp(t)
+	a.StartSession("B2", 1)
+	a.onPacket(antminerPacket("22.1.1.10", "02:81:f5:ea:e1:db", time.Now()))
+	a.Skip()
+
+	if st := a.CopyIP(0); st.Error != "" || st.Copied != "22.1.1.10" {
+		t.Errorf("CopyIP: err=%q copied=%q", st.Error, st.Copied)
+	}
+	if clipboard != "22.1.1.10" {
+		t.Errorf("clipboard holds %q, want the IP", clipboard)
+	}
+
+	if st := a.CopyMAC(0); st.Error != "" || st.Copied != "02:81:f5:ea:e1:db" {
+		t.Errorf("CopyMAC: err=%q copied=%q", st.Error, st.Copied)
+	}
+	if clipboard != "02:81:f5:ea:e1:db" {
+		t.Errorf("clipboard holds %q, want the MAC", clipboard)
+	}
+}
+
+// A skipped row has nothing to copy, and a row that does not exist is not a
+// crash. Both must report rather than silently putting something wrong on the
+// clipboard.
+func TestCopyRefusesWhenThereIsNothingToCopy(t *testing.T) {
+	clipboard := "untouched"
+	orig := setClipboard
+	setClipboard = func(_ context.Context, s string) error { clipboard = s; return nil }
+	defer func() { setClipboard = orig }()
+
+	a := newTestApp(t)
+	a.StartSession("B2", 1)
+	a.Skip()
+
+	for _, st := range []State{a.CopyIP(0), a.CopyMAC(0), a.CopyIP(99), a.CopyMAC(-1)} {
+		if st.Error == "" {
+			t.Errorf("copy succeeded with nothing to copy: %+v", st.Copied)
+		}
+	}
+	if clipboard != "untouched" {
+		t.Errorf("clipboard was written as %q despite there being nothing to copy", clipboard)
 	}
 }

@@ -222,12 +222,33 @@ func Run(opts Options, stop <-chan struct{}) error {
 // onPacket is called from a single goroutine, so it does not need to be safe
 // for concurrent use, but it must not block for long: everything else is
 // waiting behind it.
-func Listen(ports []int, onPacket func(Packet), stop <-chan struct{}) (bound int, err error) {
+//
+// The returned channel closes once every socket is shut and the last packet
+// has been delivered. Waiting on it matters more than it looks: these sockets
+// are opened with SO_REUSEPORT, so a second listener started before the first
+// has finished closing joins the same group and the kernel load-balances
+// unicast datagrams between them — the packet goes to the socket on its way
+// out and is never seen.
+func Listen(ports []int, onPacket func(Packet), stop <-chan struct{}) (bound int, stopped <-chan struct{}, err error) {
+	return ListenOn(AllInterfaces, ports, onPacket, stop)
+}
+
+// AllInterfaces is the bind address that hears broadcasts arriving on any
+// network the machine is attached to. It is what a walk wants.
+const AllInterfaces = "0.0.0.0"
+
+// ListenOn is Listen bound to one specific local address.
+//
+// Binding a particular interface is occasionally what you want on a laptop
+// attached to two networks at once. It also gives a caller a socket that does
+// not share a port with a listener on 0.0.0.0: the kernel delivers a unicast
+// datagram to the most specific matching bind, so the two do not compete.
+func ListenOn(addr string, ports []int, onPacket func(Packet), stop <-chan struct{}) (bound int, stopped <-chan struct{}, err error) {
 	raiseFDLimit()
 
-	conns, _ := bindAll(ports)
+	conns, _ := bindAllOn(addr, ports)
 	if len(conns) == 0 {
-		return 0, fmt.Errorf("could not bind any of the %d requested ports", len(ports))
+		return 0, nil, fmt.Errorf("could not bind any of the %d requested ports", len(ports))
 	}
 
 	packets := make(chan Packet, 256)
@@ -249,19 +270,25 @@ func Listen(ports []int, onPacket func(Packet), stop <-chan struct{}) (bound int
 		close(packets)
 	}()
 
+	finished := make(chan struct{})
 	go func() {
+		defer close(finished)
 		for p := range packets {
 			onPacket(p)
 		}
 	}()
 
-	return len(conns), nil
+	return len(conns), finished, nil
 }
 
 // bindAll opens one UDP socket per port on 0.0.0.0, which is what receives
 // both subnet broadcasts and 255.255.255.255. Returns the sockets that opened
 // and a description of each that did not.
 func bindAll(ports []int) ([]*net.UDPConn, []string) {
+	return bindAllOn(AllInterfaces, ports)
+}
+
+func bindAllOn(addr string, ports []int) ([]*net.UDPConn, []string) {
 	lc := net.ListenConfig{
 		Control: func(network, address string, c syscall.RawConn) error {
 			return c.Control(setReuse)
@@ -271,7 +298,7 @@ func bindAll(ports []int) ([]*net.UDPConn, []string) {
 	var conns []*net.UDPConn
 	var errs []string
 	for _, p := range ports {
-		pc, err := lc.ListenPacket(context.Background(), "udp4", fmt.Sprintf("0.0.0.0:%d", p))
+		pc, err := lc.ListenPacket(context.Background(), "udp4", fmt.Sprintf("%s:%d", addr, p))
 		if err != nil {
 			errs = append(errs, fmt.Sprintf("  port %-6d %v", p, err))
 			continue

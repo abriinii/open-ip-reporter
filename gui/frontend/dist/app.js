@@ -61,6 +61,7 @@ function render(s) {
     (s.hasSession && !s.active ? "  ·  stopped" : "");
 
   if (s.error) hint(s.error, true);
+  else if (s.copied) hint(`copied ${s.copied}`);
   else if (!s.listening) hint("not listening — no ports could be opened", true);
   else if (s.exported) hint(`exported ${s.exported}`);
 
@@ -84,14 +85,28 @@ function renderRows(s) {
       ev.preventDefault();
       selected = i;
       renderRows(state);
+      // Label the copy items with the values they will actually put on the
+      // clipboard, and disable them on a row that has none.
+      $("ctx-ip").textContent = e.ip || "";
+      $("ctx-mac").textContent = e.mac || "";
+      $("ctx").querySelector('[data-act="copyip"]').disabled = !e.ip;
+      $("ctx").querySelector('[data-act="copymac"]').disabled = !e.mac;
       openMenu($("ctx"), ev.clientX, ev.clientY);
+    };
+    // Double-clicking a cell copies just that cell, which is quicker than the
+    // menu when you already know which one you want.
+    tr.ondblclick = async (ev) => {
+      const cell = ev.target.closest("td");
+      if (!cell) return;
+      if (cell.classList.contains("ip")) render(await call("CopyIP", i));
+      else if (cell.classList.contains("mac")) render(await call("CopyMAC", i));
     };
 
     tr.innerHTML =
       `<td class="no">${i + 1}</td><td class="pos">${e.row}</td><td class="pos">${e.column}</td>` +
       (e.kind === "skipped"
         ? `<td class="skip" colspan="2">skipped</td>`
-        : `<td class="mono">${esc(e.ip)}</td><td class="mono">${esc(e.mac)}</td>`) +
+        : `<td class="mono ip">${esc(e.ip)}</td><td class="mono mac">${esc(e.mac)}</td>`) +
       `<td class="note" title="${esc(e.note)}">${esc(e.note)}</td>`;
     body.appendChild(tr);
   });
@@ -156,6 +171,8 @@ $("ctx").onclick = async (ev) => {
   if (!act || selected < 0) return;
   closeMenus();
   switch (act) {
+    case "copyip": render(await call("CopyIP", selected)); break;
+    case "copymac": render(await call("CopyMAC", selected)); break;
     case "mac": await editMAC(selected); break;
     case "pos": await editRowPosition(selected); break;
     case "note": await editNote(selected); break;

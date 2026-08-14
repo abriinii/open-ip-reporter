@@ -232,5 +232,6 @@ td.note { color: var(--text-2); white-space: nowrap; overflow: hidden; text-over
 }
 .menu button:hover:not(:disabled) { background: var(--row-hover); }
 .menu button:disabled { color: var(--text-3); cursor: default; }
+.menu-val { display: block; color: var(--text-3); font: 11px var(--mono); margin-top: 1px; }
 .menu button small { display: block; color: var(--text-3); font-size: 11px; margin-top: 1px; }
 .menu-sep { height: 1px; background: var(--line); margin: 4px 2px; }

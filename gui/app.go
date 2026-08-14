@@ -46,6 +46,7 @@ type App struct {
 	boundPorts int
 	exported   string // filename of the most recent export, for the status bar
 	stopListen chan struct{}
+	listenDone <-chan struct{}
 
 	sessionDir string
 }
@@ -82,7 +83,7 @@ func (a *App) startListening() {
 	stop := a.stopListen
 	a.mu.Unlock()
 
-	bound, err := capture.Listen(capture.DefaultPorts, a.onPacket, stop)
+	bound, done, err := capture.Listen(capture.DefaultPorts, a.onPacket, stop)
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if err != nil {
@@ -92,16 +93,25 @@ func (a *App) startListening() {
 	}
 	a.listening = true
 	a.boundPorts = bound
+	a.listenDone = done
 }
 
 func (a *App) stopListening() {
 	a.mu.Lock()
-	defer a.mu.Unlock()
 	if !a.listening {
+		a.mu.Unlock()
 		return
 	}
 	close(a.stopListen)
 	a.listening = false
+	done := a.listenDone
+	a.mu.Unlock()
+
+	// Wait for the sockets to actually close rather than merely asking them
+	// to, so nothing is still holding a port after shutdown returns.
+	if done != nil {
+		<-done
+	}
 }
 
 // onPacket runs for every datagram received. It is the only path by which a
@@ -283,6 +293,45 @@ func (a *App) SetNextPosition(column, row int) State {
 	})
 }
 
+// setClipboard is a variable so the copy logic can be tested without a live
+// window: the real function needs a Wails context that only exists at runtime.
+var setClipboard = runtime.ClipboardSetText
+
+// CopyIP and CopyMAC put one field of a row on the clipboard.
+//
+// They read from the session rather than taking a value from the window, so
+// what lands on the clipboard is what was recorded, not what happened to be
+// rendered — the two could differ if the screen were mid-refresh.
+func (a *App) CopyIP(i int) State  { return a.copyField(i, "IP") }
+func (a *App) CopyMAC(i int) State { return a.copyField(i, "MAC") }
+
+func (a *App) copyField(i int, field string) State {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.session == nil {
+		return a.stateLocked("no rack loaded")
+	}
+	if i < 0 || i >= len(a.session.Entries) {
+		return a.stateLocked(fmt.Sprintf("no row at %d", i+1))
+	}
+
+	e := a.session.Entries[i]
+	value := e.MAC
+	if field == "IP" {
+		value = e.IP
+	}
+	if value == "" {
+		return a.stateLocked(fmt.Sprintf("row %d has no %s to copy", i+1, field))
+	}
+	if err := setClipboard(a.ctx, value); err != nil {
+		return a.stateLocked(fmt.Sprintf("could not copy: %v", err))
+	}
+
+	st := a.stateLocked("")
+	st.Copied = value
+	return st
+}
+
 // SetNote attaches free text to a position — why a slot was skipped, a machine
 // that would not report, anything worth finding again later.
 func (a *App) SetNote(i int, note string) State {
@@ -390,6 +439,7 @@ type State struct {
 	NextRow    int    `json:"nextRow"`
 	Recorded   int    `json:"recorded"`
 	Exported   string `json:"exported"`
+	Copied     string `json:"copied"` // what just went on the clipboard, for confirmation
 	Full       bool   `json:"full"`
 	CanUndo    bool   `json:"canUndo"`
 	CanRedo    bool   `json:"canRedo"`
