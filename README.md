@@ -22,9 +22,15 @@ programs there — you almost certainly want the first one.
 
 Nothing to install either way. One file, download and run.
 
-**The laptop must be plugged into the miner network.** The reports are layer-2
-UDP broadcasts. They do not cross a router, a VPN, or a Tailscale subnet route
-— only a machine physically on that segment can hear them.
+**The laptop must be plugged into the switch in the can you are walking.** The
+reports are layer-2 UDP broadcasts. They do not cross a router, a VPN, or a
+Tailscale subnet route — only a machine on that segment can hear them.
+
+This bites hardest with Whatsminers. Antminer reports may still reach a desk
+elsewhere on site depending on how the network is bridged, which makes it look
+as though the tool works from anywhere; Whatsminers will simply never arrive.
+**If one miner type reports and another does not, check where you are plugged
+in before suspecting the software.**
 
 ### First run on Windows
 

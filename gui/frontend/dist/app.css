@@ -11,6 +11,10 @@
   --text-3: #8a8a8a;
   --accent: #0067c0;
   --accent-hover: #0078d4;
+  /* Windows' own critical red, picked to sit at the same weight and
+     saturation as the accent blue so Start and Stop read as one pair. */
+  --stop: #c42b1c;
+  --stop-hover: #d13438;
   --row-alt: #fafafa;
   --row-hover: #f0f6fc;
   --row-sel: #e5f0fb;
@@ -26,10 +30,13 @@
     --bg: #202020; --card: #2b2b2b; --line: #3a3a3a; --line-soft: #333333;
     --text: #ffffff; --text-2: #cfcfcf; --text-3: #9a9a9a;
     --accent: #4cc2ff; --accent-hover: #64ccff;
+    --stop: #ff99a4; --stop-hover: #ffb3bc;
     --row-alt: #303030; --row-hover: #383838; --row-sel: #3b4a5a;
     --bad: #ff99a4; --bad-bg: #442726; --skip: #7a7a7a;
   }
+  /* Both buttons are pale fills in dark mode, so both need dark text. */
   button.start { color: #08151f !important; }
+  button.start.running { color: #2b0a0d !important; }
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -97,8 +104,8 @@ button.start {
 }
 button.start:hover { background: var(--accent-hover); }
 button.start:active { opacity: .8; }
-button.start.running { background: transparent; color: var(--text); border-color: var(--line); border-bottom-color: var(--text-3); }
-button.start.running:hover { background: var(--row-hover); }
+button.start.running { background: var(--stop); border-color: transparent; color: #fff; }
+button.start.running:hover { background: var(--stop-hover); }
 .glyph { font-size: 14px; }
 
 /* ---------- card ---------- */
