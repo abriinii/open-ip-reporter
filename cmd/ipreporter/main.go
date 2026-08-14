@@ -19,7 +19,9 @@ import (
 	"betteripreporter/internal/parse"
 )
 
-const version = "0.1.0-phase0"
+// version is set at build time by the release workflow, so it always matches
+// the tag it was built from rather than drifting from a hand-edited constant.
+var version = "dev"
 
 func main() {
 	cmd := "capture"
