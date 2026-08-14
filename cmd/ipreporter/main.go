@@ -11,10 +11,12 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"sort"
 	"strings"
 	"syscall"
 
 	"betteripreporter/internal/capture"
+	"betteripreporter/internal/parse"
 )
 
 const version = "0.1.0-phase0"
@@ -32,6 +34,8 @@ func main() {
 	switch cmd {
 	case "capture":
 		os.Exit(runCapture(args))
+	case "parse":
+		os.Exit(runParse(args))
 	case "ports":
 		runPorts()
 	case "sniff":
@@ -52,6 +56,7 @@ func usage() {
 
   ipreporter                 record miner broadcasts (same as "capture")
   ipreporter capture         record miner broadcasts
+  ipreporter parse FILE      decode a capture into miner reports
   ipreporter ports           list the UDP ports capture will listen on
   ipreporter sniff           show the fallback for finding an unknown port
   ipreporter version         print version
@@ -127,6 +132,68 @@ func runCapture(args []string) int {
 		fmt.Fprintf(os.Stderr, "\nerror: %v\n", err)
 		return 1
 	}
+	return 0
+}
+
+func runParse(args []string) int {
+	fs := flag.NewFlagSet("parse", flag.ExitOnError)
+	fs.Parse(args)
+	if fs.NArg() != 1 {
+		fmt.Fprintln(os.Stderr, "usage: ipreporter parse captures/capture-....jsonl")
+		return 2
+	}
+
+	reports, stats, err := parse.ParseFile(fs.Arg(0))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 1
+	}
+
+	fmt.Printf("\n  %d packets read.  %d were miner reports, collapsing to %d button presses.\n",
+		stats.TotalPackets, stats.Decoded, stats.Presses)
+	if stats.Collapsed > 0 {
+		fmt.Printf("  %d were the miner's own repeat of a report it had just sent.\n", stats.Collapsed)
+	}
+
+	if len(reports) > 0 {
+		fmt.Printf("\n  %-4s %-12s %-14s %-19s %-9s %s\n", "#", "TIME", "IP", "MAC", "VENDOR", "CAN")
+		fmt.Printf("  %s\n", strings.Repeat("─", 68))
+		for i, r := range reports {
+			can := r.Can
+			if can == "" {
+				can = "?"
+			}
+			fmt.Printf("  %-4d %-12s %-14s %-19s %-9s %s\n",
+				i+1, r.TS.Format("15:04:05"), r.IP, r.MAC, r.Vendor, can)
+		}
+	}
+
+	if len(stats.Duplicates) > 0 {
+		fmt.Printf("\n  DUPLICATE MACs — these reported more than once, too far apart to be\n")
+		fmt.Printf("  the miner repeating itself. Check them before trusting the walk:\n\n")
+		for _, d := range stats.Duplicates {
+			var times []string
+			for _, t := range d.Times {
+				times = append(times, t.Format("15:04:05"))
+			}
+			fmt.Printf("    %s  at %s\n", d.MAC, strings.Join(times, ", "))
+		}
+	}
+
+	if len(stats.Unparsed) > 0 {
+		fmt.Printf("\n  Packets no handler recognised:\n")
+		ports := make([]int, 0, len(stats.Unparsed))
+		for p := range stats.Unparsed {
+			ports = append(ports, p)
+		}
+		sort.Slice(ports, func(i, j int) bool { return stats.Unparsed[ports[i]] > stats.Unparsed[ports[j]] })
+		for _, p := range ports {
+			fmt.Printf("    udp/%-6d %5d\n", p, stats.Unparsed[p])
+		}
+		fmt.Printf("\n  Known formats: %s. If a miner you pressed is missing above,\n", strings.Join(parse.HandlerNames(), ", "))
+		fmt.Printf("  send the capture file — its format still needs a handler.\n")
+	}
+	fmt.Println()
 	return 0
 }
 

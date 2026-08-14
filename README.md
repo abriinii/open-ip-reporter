@@ -97,10 +97,35 @@ One button press per miner type is enough, but a few of each is better:
 Note which miner type you pressed and roughly when, so the packets can be told
 apart in the log.
 
+### Decoding a capture
+
+```
+ipreporter parse captures/capture-20260813-232940.jsonl
+```
+
+```
+  68 packets read.  4 were miner reports, collapsing to 2 button presses.
+  2 were the miner's own repeat of a report it had just sent.
+
+  #    TIME         IP             MAC                 VENDOR    CAN
+  ────────────────────────────────────────────────────────────────────
+  1    23:30:21     21.1.1.43      02:81:f5:ea:e1:db   Antminer  B1
+  2    23:30:25     21.1.11.232    02:ad:af:02:ff:45   Antminer  B1
+```
+
+**Antminers send every report twice, one second apart.** That is the miner's
+design, not a double press. The parser folds the pair into one press, because
+otherwise every machine on site would look like a duplicate.
+
+A MAC that reports again *outside* that window is a real duplicate — a double
+tap, or the same machine walked past twice — and gets flagged loudly, because
+that is one of the main ways a site map gets silently corrupted.
+
 ### Commands
 
 ```
 ipreporter                 record miner broadcasts
+ipreporter parse FILE      decode a capture into miner reports
 ipreporter ports           list the UDP ports it listens on
 ipreporter sniff           how to find a port it cannot see (read this if a press produces nothing)
 ipreporter version         print version
