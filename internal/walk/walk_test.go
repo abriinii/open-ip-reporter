@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-var b1 = Geometry{Rows: 10, Columns: 6} // a standard A/B can rack: 60 positions
+var b1 = Geometry{Rows: 10, Columns: 5} // a standard A/B can rack: 50 positions
 var o1 = Geometry{Rows: 8, Columns: 6}  // an O can rack: 48 positions
 
 func newTestSession(t *testing.T, g Geometry) *Session {
@@ -27,9 +27,9 @@ func TestWalkOrderIsColumnMajor(t *testing.T) {
 		{Can: "B1", Rack: 3, Column: 1, Row: 10},
 		{Can: "B1", Rack: 3, Column: 2, Row: 1},
 		{Can: "B1", Rack: 3, Column: 2, Row: 2},
-		{Can: "B1", Rack: 3, Column: 6, Row: 10},
+		{Can: "B1", Rack: 3, Column: 5, Row: 10},
 	}
-	indices := []int{0, 1, 9, 10, 11, 59}
+	indices := []int{0, 1, 9, 10, 11, 49}
 	for k, idx := range indices {
 		got, ok := PositionAt("B1", 3, b1, idx)
 		if !ok {
@@ -42,13 +42,13 @@ func TestWalkOrderIsColumnMajor(t *testing.T) {
 			t.Errorf("%v.Index() = %d, want %d — Index and PositionAt must be inverses", got, back, idx)
 		}
 	}
-	if _, ok := PositionAt("B1", 3, b1, 60); ok {
-		t.Error("PositionAt(60) succeeded on a 60-position rack, want out of range")
+	if _, ok := PositionAt("B1", 3, b1, 50); ok {
+		t.Error("PositionAt(50) succeeded on a 50-position rack, want out of range")
 	}
 }
 
 func TestRackEndsAfterLastPosition(t *testing.T) {
-	last := Position{Can: "B1", Rack: 3, Column: 6, Row: 10}
+	last := Position{Can: "B1", Rack: 3, Column: 5, Row: 10}
 	if _, ok := last.Next(b1); ok {
 		t.Error("Next() past the last position succeeded, want end of rack")
 	}
@@ -162,7 +162,7 @@ func TestSetPositionRejectsPositionsOutsideTheRack(t *testing.T) {
 	s := newTestSession(t, b1)
 	s.Record("02:00:00:00:00:01", "", "Antminer", time.Now())
 	for _, bad := range []Position{
-		{Can: "B1", Rack: 3, Column: 7, Row: 1},  // no column 7
+		{Can: "B1", Rack: 3, Column: 6, Row: 1},  // no column 6
 		{Can: "B1", Rack: 3, Column: 1, Row: 11}, // no row 11
 		{Can: "B1", Rack: 3, Column: 0, Row: 1},
 		{Can: "B1", Rack: 3, Column: 1, Row: 0},
@@ -419,8 +419,8 @@ func TestNewSessionRejectsNonsense(t *testing.T) {
 func TestDefaultGeometryMatchesTheSite(t *testing.T) {
 	for _, can := range []string{"A1", "A2", "A5", "A6", "A7", "A8", "B1", "B2", "B3", "B4"} {
 		g, ok := DefaultGeometry(can)
-		if !ok || g.Positions() != 60 {
-			t.Errorf("%s geometry %v (%d positions), want 60", can, g, g.Positions())
+		if !ok || g.Positions() != 50 {
+			t.Errorf("%s geometry %v (%d positions), want 50", can, g, g.Positions())
 		}
 	}
 	for _, can := range []string{"O1", "O2", "O3"} {
@@ -429,10 +429,11 @@ func TestDefaultGeometryMatchesTheSite(t *testing.T) {
 			t.Errorf("%s geometry %v (%d positions), want 48", can, g, g.Positions())
 		}
 	}
-	// A3 and A4 are out of commission and must not be offered as walkable.
-	for _, can := range []string{"A3", "A4"} {
+	// A3 and A4 are out of commission, and there is no O4 — 34.x is the
+	// testbench. None may be offered as walkable.
+	for _, can := range []string{"A3", "A4", "O4"} {
 		if _, ok := DefaultGeometry(can); ok {
-			t.Errorf("%s has a geometry, but the can is out of commission", can)
+			t.Errorf("%s has a geometry, but it is not a walkable can", can)
 		}
 	}
 }
@@ -509,5 +510,33 @@ func TestPendingPositionSurvivesReload(t *testing.T) {
 	}
 	if n, _ := got.NextPosition(); n.Column != 3 || n.Row != 7 {
 		t.Errorf("after reload next is %s, want C3/7", n.Short())
+	}
+}
+
+// Fifty is the most machines any rack here holds, so geometry that implies
+// more cannot be real and must be refused before it creates positions no
+// machine can occupy.
+func TestGeometryIsBoundedByWhatTheSiteActuallyHas(t *testing.T) {
+	for _, g := range []Geometry{
+		{Rows: 10, Columns: 6}, // 60
+		{Rows: 12, Columns: 5}, // 60
+		{Rows: 8, Columns: 7},  // 56
+	} {
+		if g.Valid() {
+			t.Errorf("%dx%d (%d positions) accepted, want refusal above %d",
+				g.Rows, g.Columns, g.Positions(), MaxPositions)
+		}
+		if _, err := NewSession("B1", 1, g); err == nil {
+			t.Errorf("NewSession accepted %dx%d", g.Rows, g.Columns)
+		}
+	}
+	for _, g := range []Geometry{
+		{Rows: 10, Columns: 5}, // 50, an A or B rack
+		{Rows: 8, Columns: 6},  // 48, an outdoor rack of Whatsminers
+		{Rows: 8, Columns: 5},  // 40
+	} {
+		if !g.Valid() {
+			t.Errorf("%dx%d (%d positions) refused, want accepted", g.Rows, g.Columns, g.Positions())
+		}
 	}
 }

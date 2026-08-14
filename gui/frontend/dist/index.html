@@ -21,6 +21,14 @@
       <label for="rack">Rack</label>
       <input id="rack" type="number" min="1" max="20" value="1">
     </div>
+    <div class="field size">
+      <label for="geom-rows">Rack size</label>
+      <div class="size-pair">
+        <input id="geom-rows" type="number" min="1" max="50" value="10" title="rows">
+        <span class="times">&times;</span>
+        <input id="geom-cols" type="number" min="1" max="50" value="5" title="columns">
+      </div>
+    </div>
     <div class="field narrow">
       <label for="row">Row</label>
       <input id="row" type="number" min="1" value="1">
@@ -44,7 +52,7 @@
         <button id="undo" class="tool" title="Undo (Ctrl+Z)">Undo</button>
         <button id="redo" class="tool" title="Redo (Ctrl+Y)">Redo</button>
         <span class="tool-sep"></span>
-        <button id="export" class="tool">Export <span class="caret">&#9662;</span></button>
+        <button id="export" class="tool">Export CSV</button>
       </div>
     </header>
 
@@ -78,11 +86,6 @@
   <div class="menu-sep"></div>
   <button data-act="insert">Insert blank above</button>
   <button data-act="delete">Delete row</button>
-</div>
-
-<div id="exportmenu" class="menu hidden">
-  <button data-fmt="positional">Positional CSV <small>same as the current process</small></button>
-  <button data-fmt="tagged">Position-tagged CSV <small>can / rack / row / column per MAC</small></button>
 </div>
 
 <script src="/wails/runtime.js"></script>

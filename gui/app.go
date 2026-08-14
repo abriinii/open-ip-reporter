@@ -170,16 +170,33 @@ func (a *App) Cans() []string {
 	return cans
 }
 
+// GeometryFor reports the usual shape of a can's racks, for prefilling the
+// size boxes. The operator can still override it.
+func (a *App) GeometryFor(can string) walk.Geometry {
+	g, _ := walk.DefaultGeometry(can)
+	return g
+}
+
 // StartSession begins a walk, resuming a saved one for the same rack if there
 // is one. Resuming rather than overwriting is the whole point of persistence:
 // a closed lid mid-rack must not cost the walk.
-func (a *App) StartSession(can string, rack int) State {
+func (a *App) StartSession(can string, rack, rows, columns int) State {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
 	g, ok := walk.DefaultGeometry(can)
 	if !ok {
-		return a.stateLocked(fmt.Sprintf("no geometry known for can %q", can))
+		return a.stateLocked(fmt.Sprintf("%s is not a can that can be walked", can))
+	}
+	// Whatever the operator typed wins over the default: they are looking at
+	// the rack and the default is only a starting point.
+	if rows > 0 && columns > 0 {
+		g = walk.Geometry{Rows: rows, Columns: columns}
+	}
+	if !g.Valid() {
+		return a.stateLocked(fmt.Sprintf(
+			"%d rows x %d columns is %d positions; no rack here holds more than %d",
+			g.Rows, g.Columns, g.Rows*g.Columns, walk.MaxPositions))
 	}
 
 	path := a.pathFor(can, rack)
@@ -285,27 +302,18 @@ func (a *App) mutate(f func(*walk.Session) error) State {
 
 // Export writes the walk to a CSV the operator picks a location for.
 //
-// "positional" is the default and matches what the existing process consumes.
-// "tagged" carries can/rack/row/column on every row.
-func (a *App) Export(format string) State {
+// One format only: the positional file the existing process already consumes.
+func (a *App) Export() State {
 	a.mu.Lock()
 	s := a.session
 	a.mu.Unlock()
-
 	if s == nil {
 		return a.State()
 	}
 
-	name, writer := export.PositionalName(s), export.Positional
-	title := "Export positional CSV"
-	if format == "tagged" {
-		name, writer = export.TaggedName(s), export.Tagged
-		title = "Export position-tagged CSV"
-	}
-
 	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
-		Title:           title,
-		DefaultFilename: name,
+		Title:           "Export CSV",
+		DefaultFilename: export.PositionalName(s),
 		Filters:         []runtime.FileFilter{{DisplayName: "CSV (*.csv)", Pattern: "*.csv"}},
 	})
 	if err != nil || path == "" {
@@ -314,7 +322,7 @@ func (a *App) Export(format string) State {
 
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if err := export.WriteFile(path, a.session, writer); err != nil {
+	if err := export.WriteFile(path, a.session, export.Positional); err != nil {
 		return a.stateLocked(err.Error())
 	}
 	a.exported = filepath.Base(path)

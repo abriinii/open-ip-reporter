@@ -10,7 +10,7 @@ import (
 	"betteripreporter/internal/walk"
 )
 
-var b1 = walk.Geometry{Rows: 10, Columns: 6}
+var b1 = walk.Geometry{Rows: 10, Columns: 5}
 
 func newSession(t *testing.T) *walk.Session {
 	t.Helper()
@@ -114,46 +114,9 @@ func TestPositionalRefusesCollidingPositions(t *testing.T) {
 	}
 }
 
-func TestTaggedCarriesPositionOnEveryRow(t *testing.T) {
-	s := newSession(t)
-	s.Record("02:81:f5:ea:e1:db", "21.1.1.43", "Antminer", time.Now())
-	s.Skip()
-	s.Record("02:ad:af:02:ff:45", "21.1.11.232", "Antminer", time.Now())
-
-	var sb strings.Builder
-	if err := Tagged(&sb, s); err != nil {
-		t.Fatal(err)
-	}
-	want := "can,rack,row,column,ip,mac\n" +
-		"B1,3,1,1,21.1.1.43,02:81:f5:ea:e1:db\n" +
-		"B1,3,3,1,21.1.11.232,02:ad:af:02:ff:45\n"
-	if sb.String() != want {
-		t.Errorf("tagged export:\n%q\nwant:\n%q", sb.String(), want)
-	}
-}
-
-// The tagged file is a join table, so a skipped position has nothing to
-// contribute and must not appear as a machine with no MAC.
-func TestTaggedOmitsSkippedPositions(t *testing.T) {
-	s := newSession(t)
-	s.Skip()
-	s.Skip()
-	var sb strings.Builder
-	if err := Tagged(&sb, s); err != nil {
-		t.Fatal(err)
-	}
-	if n := strings.Count(sb.String(), "\n"); n != 1 {
-		t.Errorf("tagged export has %d lines, want just the header", n)
-	}
-}
-
-func TestNamesAreOneFilePerRack(t *testing.T) {
-	s := newSession(t)
-	if got := PositionalName(s); got != "B1-rack3.csv" {
+func TestNameIsOneFilePerRack(t *testing.T) {
+	if got := PositionalName(newSession(t)); got != "B1-rack3.csv" {
 		t.Errorf("PositionalName = %q", got)
-	}
-	if got := TaggedName(s); got != "B1-rack3-tagged.csv" {
-		t.Errorf("TaggedName = %q", got)
 	}
 }
 

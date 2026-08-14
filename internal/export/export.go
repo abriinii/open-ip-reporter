@@ -1,24 +1,21 @@
 // Package export writes a finished walk out as CSV.
 //
-// Two formats, for two different readers:
+// One format, deliberately: what other people on site already consume. Row n
+// of the file is grid position n, and a skipped position is a blank row, so
+// nothing about their workflow changes.
 //
-//   - Positional is what other people on site already consume. Row n of the
-//     file is grid position n, and a skipped position is a blank row. Nothing
-//     about their workflow changes.
-//   - Tagged carries can/rack/row/column on every line, so correlating serial
-//     to MAC becomes a join instead of an assumption about ordering. This is
-//     the format that makes a missed machine harmless.
+// The position recorded during the walk is what makes those blank rows land in
+// the right places — including gaps left by correcting the walk mid-rack, which
+// a person pressing Skip would have no way to reproduce.
 package export
 
 import (
+	"betteripreporter/internal/walk"
 	"encoding/csv"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"strconv"
-
-	"betteripreporter/internal/walk"
 )
 
 // Positional writes the format the existing process expects: one row per grid
@@ -45,37 +42,6 @@ func Positional(w io.Writer, s *walk.Session) error {
 			continue
 		}
 		if err := cw.Write([]string{e.IP, e.MAC}); err != nil {
-			return err
-		}
-	}
-	cw.Flush()
-	return cw.Error()
-}
-
-// Tagged writes one row per recorded machine with its physical position
-// attached, for correlating against the sitemap by position rather than by
-// row order.
-func Tagged(w io.Writer, s *walk.Session) error {
-	cw := csv.NewWriter(w)
-	if err := cw.Write([]string{"can", "rack", "row", "column", "ip", "mac"}); err != nil {
-		return err
-	}
-	for i, e := range s.Entries {
-		if e.Kind != walk.Reported {
-			continue
-		}
-		p, ok := s.PositionOf(i)
-		if !ok {
-			continue
-		}
-		if err := cw.Write([]string{
-			p.Can,
-			strconv.Itoa(p.Rack),
-			strconv.Itoa(p.Row),
-			strconv.Itoa(p.Column),
-			e.IP,
-			e.MAC,
-		}); err != nil {
 			return err
 		}
 	}
@@ -122,11 +88,6 @@ func layout(s *walk.Session) ([]*walk.Entry, error) {
 // per rack, which is how the existing process consumes them.
 func PositionalName(s *walk.Session) string {
 	return fmt.Sprintf("%s-rack%d.csv", s.Can, s.Rack)
-}
-
-// TaggedName is the filename for the position-tagged export.
-func TaggedName(s *walk.Session) string {
-	return fmt.Sprintf("%s-rack%d-tagged.csv", s.Can, s.Rack)
 }
 
 // WriteFile writes one of the formats to a path, atomically so an interrupted

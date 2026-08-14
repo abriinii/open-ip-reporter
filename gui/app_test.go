@@ -25,7 +25,7 @@ func antminerPacket(ip, mac string, ts time.Time) capture.Packet {
 // the double-fire has to be absorbed here as well as in the offline parser.
 func TestCaptureCollapsesDoubleFire(t *testing.T) {
 	a := newTestApp(t)
-	a.StartSession("B1", 3)
+	a.StartSession("B1", 3, 0, 0)
 
 	base := time.Now()
 	a.onPacket(antminerPacket("21.1.1.43", "02:81:f5:ea:e1:db", base))
@@ -45,7 +45,7 @@ func TestCaptureCollapsesDoubleFire(t *testing.T) {
 
 func TestTwoMachinesTakeConsecutivePositions(t *testing.T) {
 	a := newTestApp(t)
-	a.StartSession("B1", 3)
+	a.StartSession("B1", 3, 0, 0)
 
 	base := time.Now()
 	a.onPacket(antminerPacket("21.1.1.43", "02:81:f5:ea:e1:db", base))
@@ -65,7 +65,7 @@ func TestTwoMachinesTakeConsecutivePositions(t *testing.T) {
 // A skip must hold its position open, which is the whole reason it exists.
 func TestSkipKeepsFollowingMachinesAligned(t *testing.T) {
 	a := newTestApp(t)
-	a.StartSession("B1", 3)
+	a.StartSession("B1", 3, 0, 0)
 
 	a.onPacket(antminerPacket("21.1.1.43", "02:00:00:00:00:01", time.Now()))
 	a.Skip()
@@ -85,13 +85,13 @@ func TestSkipKeepsFollowingMachinesAligned(t *testing.T) {
 
 func TestSessionResumesInsteadOfStartingOver(t *testing.T) {
 	a := newTestApp(t)
-	a.StartSession("B1", 3)
+	a.StartSession("B1", 3, 0, 0)
 	a.onPacket(antminerPacket("21.1.1.43", "02:81:f5:ea:e1:db", time.Now()))
 	a.Skip()
 
 	// Walking away and coming back to the same rack.
-	a.StartSession("A5", 1)
-	st := a.StartSession("B1", 3)
+	a.StartSession("A5", 1, 0, 0)
+	st := a.StartSession("B1", 3, 0, 0)
 
 	if len(st.Entries) != 2 {
 		t.Fatalf("resumed with %d entries, want the 2 already recorded", len(st.Entries))
@@ -105,7 +105,7 @@ func TestSessionResumesInsteadOfStartingOver(t *testing.T) {
 // that belongs to the next real machine and shift the rest of the rack.
 func TestDuplicateIsRefusedAndCostsNoPosition(t *testing.T) {
 	a := newTestApp(t)
-	a.StartSession("B1", 3)
+	a.StartSession("B1", 3, 0, 0)
 
 	const mac = "02:81:f5:ea:e1:db"
 	base := time.Now()
@@ -132,7 +132,7 @@ func TestDuplicateIsRefusedAndCostsNoPosition(t *testing.T) {
 // Typing in a MAC that is already in the rack is the same mistake.
 func TestHandTypedDuplicateIsRefused(t *testing.T) {
 	a := newTestApp(t)
-	a.StartSession("B1", 3)
+	a.StartSession("B1", 3, 0, 0)
 	a.onPacket(antminerPacket("21.1.1.43", "02:81:f5:ea:e1:db", time.Now()))
 	a.Skip()
 
@@ -149,7 +149,7 @@ func TestHandTypedDuplicateIsRefused(t *testing.T) {
 // switch beacons alone would fill a rack in under a minute.
 func TestNonMinerTrafficIsIgnored(t *testing.T) {
 	a := newTestApp(t)
-	a.StartSession("B1", 3)
+	a.StartSession("B1", 3, 0, 0)
 
 	for i := 0; i < 50; i++ {
 		a.onPacket(capture.Packet{
@@ -172,7 +172,7 @@ func TestCapturesWithoutASessionAreDropped(t *testing.T) {
 
 func TestEditingOperationsReachTheEngine(t *testing.T) {
 	a := newTestApp(t)
-	a.StartSession("B1", 3)
+	a.StartSession("B1", 3, 0, 0)
 	base := time.Now()
 	a.onPacket(antminerPacket("21.1.1.43", "02:00:00:00:00:01", base))
 	a.onPacket(antminerPacket("21.1.1.44", "02:00:00:00:00:02", base.Add(5*time.Second)))
@@ -211,7 +211,7 @@ func TestEditingOperationsReachTheEngine(t *testing.T) {
 
 func TestBadInputIsReportedNotApplied(t *testing.T) {
 	a := newTestApp(t)
-	a.StartSession("B1", 3)
+	a.StartSession("B1", 3, 0, 0)
 	a.onPacket(antminerPacket("21.1.1.43", "02:00:00:00:00:01", time.Now()))
 
 	if st := a.SetMAC(0, "definitely not a mac"); st.Error == "" {
@@ -230,11 +230,43 @@ func TestBadInputIsReportedNotApplied(t *testing.T) {
 
 func TestUnknownCanIsRefused(t *testing.T) {
 	a := newTestApp(t)
-	if st := a.StartSession("Z9", 1); st.Error == "" || st.Active {
+	if st := a.StartSession("Z9", 1, 0, 0); st.Error == "" || st.Active {
 		t.Error("started a walk in a can with no known geometry")
 	}
 	// A3 is out of commission and must not be walkable.
-	if st := a.StartSession("A3", 1); st.Error == "" || st.Active {
+	if st := a.StartSession("A3", 1, 0, 0); st.Error == "" || st.Active {
 		t.Error("started a walk in A3, which is out of commission")
+	}
+}
+
+// An outdoor rack refilled with Whatsminers fits six across instead of five,
+// so the operator can override the can's usual shape at the start of a walk.
+func TestRackSizeCanBeOverriddenAtStart(t *testing.T) {
+	a := newTestApp(t)
+
+	st := a.StartSession("O1", 2, 8, 6)
+	if st.Error != "" {
+		t.Fatalf("8 x 6 outdoor rack refused: %s", st.Error)
+	}
+	if st.Rows != 8 || st.Columns != 6 || st.Positions != 48 {
+		t.Errorf("got %d x %d = %d, want 8 x 6 = 48", st.Rows, st.Columns, st.Positions)
+	}
+
+	// Defaults still apply when nothing is specified.
+	st = a.StartSession("B1", 1, 0, 0)
+	if st.Rows != 10 || st.Columns != 5 {
+		t.Errorf("B1 defaulted to %d x %d, want 10 x 5", st.Rows, st.Columns)
+	}
+}
+
+// No rack here holds more than fifty, so a typo that implies one is refused
+// rather than creating positions no machine can occupy.
+func TestRackSizeBeyondWhatTheSiteHasIsRefused(t *testing.T) {
+	a := newTestApp(t)
+	for _, g := range [][2]int{{10, 6}, {12, 5}, {50, 50}} {
+		st := a.StartSession("B1", 1, g[0], g[1])
+		if st.Error == "" || st.Active {
+			t.Errorf("%d x %d accepted, want refusal", g[0], g[1])
+		}
 	}
 }

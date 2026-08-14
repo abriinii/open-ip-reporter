@@ -29,6 +29,11 @@ function render(s) {
   }
   $("can").disabled = s.active;
   $("rack").disabled = s.active;
+  // The shape of a rack is fixed once a walk begins: changing it underneath
+  // recorded rows would move machines that are already placed.
+  $("geom-rows").disabled = s.active;
+  $("geom-cols").disabled = s.active;
+  if (s.active) { $("geom-rows").value = s.rows; $("geom-cols").value = s.columns; }
   $("row").disabled = !s.active;
   $("column").disabled = !s.active;
 
@@ -116,7 +121,6 @@ function dismiss(ev) {
 function closeMenus() {
   document.removeEventListener("mousedown", dismiss);
   $("ctx").classList.add("hidden");
-  $("exportmenu").classList.add("hidden");
 }
 
 document.addEventListener("keydown", (ev) => {
@@ -135,17 +139,8 @@ $("ctx").onclick = async (ev) => {
   }
 };
 
-$("export").onclick = (ev) => {
-  ev.stopPropagation();
-  if ($("export").disabled) return;
-  const r = $("export").getBoundingClientRect();
-  openMenu($("exportmenu"), r.left, r.bottom + 4);
-};
-$("exportmenu").onclick = async (ev) => {
-  const fmt = ev.target.closest("button")?.dataset.fmt;
-  if (!fmt) return;
-  closeMenus();
-  render(await go().Export(fmt));
+$("export").onclick = async () => {
+  if (!$("export").disabled) render(await go().Export());
 };
 
 $("undo").onclick = async () => render(await go().Undo());
@@ -178,7 +173,7 @@ for (const id of ["row", "column"]) {
     if (ev.key === "Enter") { ev.preventDefault(); $(id).blur(); }
   });
 }
-for (const id of ["rack", "can"]) {
+for (const id of ["rack", "can", "geom-rows", "geom-cols"]) {
   $(id).addEventListener("focus", () => { editing = true; });
   $(id).addEventListener("blur", () => { editing = false; });
 }
@@ -236,7 +231,7 @@ document.addEventListener("keydown", async (ev) => {
       break;
 
     case "e": case "E":
-      if (ev.ctrlKey || ev.metaKey) { ev.preventDefault(); render(await go().Export("positional")); }
+      if (ev.ctrlKey || ev.metaKey) { ev.preventDefault(); render(await go().Export()); }
       break;
   }
 });
@@ -291,13 +286,21 @@ async function boot() {
     if (!Number.isFinite(rack) || rack < 1) { hint("rack must be 1 or higher", true); return; }
     selected = -1;
     lastCount = 0;
-    const s = await go().StartSession(sel.value, rack);
+    const rows = parseInt($("geom-rows").value, 10);
+    const cols = parseInt($("geom-cols").value, 10);
+    const s = await go().StartSession(sel.value, rack, rows, cols);
     render(s);
     if (!s.error) {
       const row = parseInt($("row").value, 10);
       const col = parseInt($("column").value, 10);
       if (row > 1 || col > 1) render(await go().SetNextPosition(col, row));
     }
+  };
+
+  // Prefill the size boxes from the can's usual shape, but leave them editable.
+  sel.onchange = async () => {
+    const g = await go().GeometryFor(sel.value);
+    if (g && g.Rows) { $("geom-rows").value = g.Rows; $("geom-cols").value = g.Columns; }
   };
 
   runtime.EventsOn("captured", async () => render(await go().State()));

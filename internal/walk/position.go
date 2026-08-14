@@ -16,31 +16,46 @@ type Geometry struct {
 // Positions is the number of slots in a rack of this shape.
 func (g Geometry) Positions() int { return g.Rows * g.Columns }
 
-// Valid reports whether the geometry could describe a real rack.
-func (g Geometry) Valid() bool { return g.Rows > 0 && g.Columns > 0 }
+// Valid reports whether the geometry could describe a real rack here. The
+// upper bound is as much a part of that as the lower: a rack holding more than
+// MaxPositions does not exist on this site, so accepting one would only let a
+// typo produce positions no machine can occupy.
+func (g Geometry) Valid() bool {
+	return g.Rows > 0 && g.Columns > 0 && g.Positions() <= MaxPositions
+}
 
-// geometryByCan holds the shapes observed on site. These are defaults, not
-// truth: a rack that has been rebuilt is a data-entry problem, not a reason to
-// recompile, so the session carries its own geometry and this is only the
-// starting point.
+// geometryByCan holds the shapes observed on site, as starting points rather
+// than truth. A rack that has been rebuilt, or refilled with a smaller frame,
+// is a data-entry problem and not a reason to recompile — the session carries
+// its own geometry and the operator can change it before starting a walk.
+//
+// Fifty is the most machines any single rack here holds. Outdoor cans are
+// shorter at eight rows, but fit six across when filled with Whatsminers,
+// whose frame is narrower.
 //
 // A3 and A4 are permanently out of commission and deliberately absent, though
-// their switches are still on the network.
+// their switches are still on the network. There is no O4: 34.x is the
+// testbench.
 var geometryByCan = map[string]Geometry{
-	"A1": {Rows: 10, Columns: 6},
-	"A2": {Rows: 10, Columns: 6},
-	"A5": {Rows: 10, Columns: 6},
-	"A6": {Rows: 10, Columns: 6},
-	"A7": {Rows: 10, Columns: 6}, // columns 5-6 stand empty; still walked
-	"A8": {Rows: 10, Columns: 6},
-	"B1": {Rows: 10, Columns: 6},
-	"B2": {Rows: 10, Columns: 6},
-	"B3": {Rows: 10, Columns: 6},
-	"B4": {Rows: 10, Columns: 6},
-	"O1": {Rows: 8, Columns: 6},
+	"A1": {Rows: 10, Columns: 5}, // 50
+	"A2": {Rows: 10, Columns: 5},
+	"A5": {Rows: 10, Columns: 5},
+	"A6": {Rows: 10, Columns: 5},
+	"A7": {Rows: 10, Columns: 5},
+	"A8": {Rows: 10, Columns: 5},
+	"B1": {Rows: 10, Columns: 5},
+	"B2": {Rows: 10, Columns: 5},
+	"B3": {Rows: 10, Columns: 5},
+	"B4": {Rows: 10, Columns: 5},
+	"O1": {Rows: 8, Columns: 6}, // 48: shorter, but six across
 	"O2": {Rows: 8, Columns: 6},
 	"O3": {Rows: 8, Columns: 6},
 }
+
+// MaxPositions is the most machines any rack on this site holds. Geometry
+// entered by hand is checked against it, so a typo cannot create a rack that
+// could not physically exist.
+const MaxPositions = 50
 
 // DefaultGeometry returns the known shape for a can. The second result is false
 // for a can we have no record of, so a caller can ask rather than assume.

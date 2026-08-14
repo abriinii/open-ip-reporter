@@ -60,7 +60,11 @@ html, body {
 
 .controls { display: flex; align-items: flex-end; gap: 14px; }
 .field { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
-.field.narrow { flex: 0 0 96px; }
+.field.narrow { flex: 0 0 88px; }
+.field.size { flex: 0 0 130px; }
+.size-pair { display: flex; align-items: center; gap: 6px; }
+.size-pair input { text-align: center; padding: 0 4px; }
+.times { color: var(--text-3); font-size: 13px; }
 .field label { font-size: 13px; color: var(--text); font-weight: 400; }
 
 select, input[type=number] {
