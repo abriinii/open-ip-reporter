@@ -436,3 +436,78 @@ func TestDefaultGeometryMatchesTheSite(t *testing.T) {
 		}
 	}
 }
+
+// Editing the position boxes mid-walk: the next machine lands where you say,
+// and the rack carries on from there. Nothing already recorded moves.
+func TestSetNextPositionMovesTheWalkOnly(t *testing.T) {
+	s := newTestSession(t, b1)
+	s.Record("02:00:00:00:00:01", "", "Antminer", time.Now())
+	s.Record("02:00:00:00:00:02", "", "Antminer", time.Now())
+
+	if err := s.SetNextPosition(Position{Can: "B1", Rack: 3, Column: 2, Row: 4}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Already-recorded rows are untouched.
+	if p, _ := s.PositionOf(0); p.Column != 1 || p.Row != 1 {
+		t.Errorf("first entry moved to %s", p.Short())
+	}
+	if p, _ := s.PositionOf(1); p.Column != 1 || p.Row != 2 {
+		t.Errorf("second entry moved to %s", p.Short())
+	}
+	if n, _ := s.NextPosition(); n.Column != 2 || n.Row != 4 {
+		t.Errorf("next position is %s, want C2/4", n.Short())
+	}
+
+	// The next capture lands there, and the one after continues in walk order.
+	s.Record("02:00:00:00:00:03", "", "Antminer", time.Now())
+	if p, _ := s.PositionOf(2); p.Column != 2 || p.Row != 4 {
+		t.Errorf("machine landed at %s, want C2/4", p.Short())
+	}
+	s.Record("02:00:00:00:00:04", "", "Antminer", time.Now())
+	if p, _ := s.PositionOf(3); p.Column != 2 || p.Row != 5 {
+		t.Errorf("following machine at %s, want C2/5", p.Short())
+	}
+}
+
+func TestSetNextPositionIsUndoable(t *testing.T) {
+	s := newTestSession(t, b1)
+	s.Record("02:00:00:00:00:01", "", "Antminer", time.Now())
+	s.SetNextPosition(Position{Can: "B1", Rack: 3, Column: 4, Row: 9})
+
+	if !s.Undo() {
+		t.Fatal("could not undo a position change")
+	}
+	if n, _ := s.NextPosition(); n.Column != 1 || n.Row != 2 {
+		t.Errorf("after undo next is %s, want C1/2 — undo must restore where the walk pointed", n.Short())
+	}
+}
+
+func TestSetNextPositionRejectsOutsideTheRack(t *testing.T) {
+	s := newTestSession(t, o1) // an O can: 8 rows
+	if err := s.SetNextPosition(Position{Can: "O1", Rack: 1, Column: 1, Row: 9}); err == nil {
+		t.Error("row 9 accepted in an 8-row outdoor can")
+	}
+	if err := s.SetNextPosition(Position{Can: "O1", Rack: 1, Column: 7, Row: 1}); err == nil {
+		t.Error("column 7 accepted in a 6-column rack")
+	}
+}
+
+// A hand-set position must survive a crash like everything else.
+func TestPendingPositionSurvivesReload(t *testing.T) {
+	s := newTestSession(t, b1)
+	s.Record("02:00:00:00:00:01", "", "Antminer", time.Now())
+	s.SetNextPosition(Position{Can: "B1", Rack: 3, Column: 3, Row: 7})
+
+	path := filepath.Join(t.TempDir(), "s.json")
+	if err := s.Save(path); err != nil {
+		t.Fatal(err)
+	}
+	got, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n, _ := got.NextPosition(); n.Column != 3 || n.Row != 7 {
+		t.Errorf("after reload next is %s, want C3/7", n.Short())
+	}
+}

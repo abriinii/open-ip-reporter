@@ -53,8 +53,14 @@ type Session struct {
 	Entries []Entry   `json:"entries"`
 	Started time.Time `json:"started"`
 
-	undo [][]Entry
-	redo [][]Entry
+	// Pending is where the next entry will land when it has been set by hand.
+	// Editing the position boxes on screen sets this; the next capture or skip
+	// consumes it and carries on in walk order from there.
+	Pending    Position `json:"pending,omitempty"`
+	HasPending bool     `json:"has_pending,omitempty"`
+
+	undo []snap
+	redo []snap
 }
 
 // NewSession starts a walk of one rack.
@@ -95,6 +101,9 @@ func (s *Session) anchorFor(i int) (base Position, steps int) {
 
 // NextPosition is where the next entry will land.
 func (s *Session) NextPosition() (Position, bool) {
+	if s.HasPending {
+		return s.Pending, true
+	}
 	if len(s.Entries) == 0 {
 		return PositionAt(s.Can, s.Rack, s.Geom, 0)
 	}
@@ -103,6 +112,30 @@ func (s *Session) NextPosition() (Position, bool) {
 		return Position{}, false
 	}
 	return last.Next(s.Geom)
+}
+
+// SetNextPosition moves the walk to a position without touching what has
+// already been recorded. This is the "I'm off by one, fix it in place" case:
+// correct the boxes on screen and the next machine lands where you say, with
+// the rest of the rack following on from there.
+func (s *Session) SetNextPosition(p Position) error {
+	if !p.Valid(s.Geom) {
+		return fmt.Errorf("%s is outside a %d x %d rack", p.Short(), s.Geom.Columns, s.Geom.Rows)
+	}
+	s.snapshot()
+	s.Pending = p
+	s.HasPending = true
+	return nil
+}
+
+// takePending applies a hand-set position to a newly appended entry.
+func (s *Session) takePending(e *Entry) {
+	if s.HasPending {
+		e.HasAnchor = true
+		e.Anchor = s.Pending
+		s.HasPending = false
+		s.Pending = Position{}
+	}
 }
 
 // Full reports whether the rack has as many entries as it has positions.
@@ -148,9 +181,9 @@ func (s *Session) Record(mac, ip, vendor string, ts time.Time) (Position, error)
 		return Position{}, &DuplicateError{MAC: normaliseMAC(mac), Index: i, Position: at}
 	}
 	s.snapshot()
-	s.Entries = append(s.Entries, Entry{
-		Kind: Reported, MAC: normaliseMAC(mac), IP: ip, Vendor: vendor, TS: ts,
-	})
+	e := Entry{Kind: Reported, MAC: normaliseMAC(mac), IP: ip, Vendor: vendor, TS: ts}
+	s.takePending(&e)
+	s.Entries = append(s.Entries, e)
 	p, _ := s.PositionOf(len(s.Entries) - 1)
 	return p, nil
 }
@@ -159,7 +192,9 @@ func (s *Session) Record(mac, ip, vendor string, ts time.Time) (Position, error)
 // machine that will not report. This is the single most-pressed key on a walk.
 func (s *Session) Skip() (Position, bool) {
 	s.snapshot()
-	s.Entries = append(s.Entries, Entry{Kind: Skipped, TS: time.Now()})
+	e := Entry{Kind: Skipped, TS: time.Now()}
+	s.takePending(&e)
+	s.Entries = append(s.Entries, e)
 	return s.PositionOf(len(s.Entries) - 1)
 }
 
@@ -277,8 +312,29 @@ func (s *Session) SortedDuplicateMACs() []string {
 
 const maxUndo = 200
 
+type snap struct {
+	entries    []Entry
+	pending    Position
+	hasPending bool
+}
+
+// capture takes a copy of everything an operation could change. The pending
+// position belongs in here as much as the entries do: undoing a correction has
+// to put the walk back where it was pointing, not just restore the rows.
+func (s *Session) capture() snap {
+	entries := make([]Entry, len(s.Entries))
+	copy(entries, s.Entries)
+	return snap{entries: entries, pending: s.Pending, hasPending: s.HasPending}
+}
+
+func (s *Session) restore(sn snap) {
+	s.Entries = sn.entries
+	s.Pending = sn.pending
+	s.HasPending = sn.hasPending
+}
+
 func (s *Session) snapshot() {
-	s.undo = append(s.undo, cloneEntries(s.Entries))
+	s.undo = append(s.undo, s.capture())
 	if len(s.undo) > maxUndo {
 		s.undo = s.undo[len(s.undo)-maxUndo:]
 	}
@@ -290,8 +346,8 @@ func (s *Session) Undo() bool {
 	if len(s.undo) == 0 {
 		return false
 	}
-	s.redo = append(s.redo, cloneEntries(s.Entries))
-	s.Entries = s.undo[len(s.undo)-1]
+	s.redo = append(s.redo, s.capture())
+	s.restore(s.undo[len(s.undo)-1])
 	s.undo = s.undo[:len(s.undo)-1]
 	return true
 }
@@ -301,8 +357,8 @@ func (s *Session) Redo() bool {
 	if len(s.redo) == 0 {
 		return false
 	}
-	s.undo = append(s.undo, cloneEntries(s.Entries))
-	s.Entries = s.redo[len(s.redo)-1]
+	s.undo = append(s.undo, s.capture())
+	s.restore(s.redo[len(s.redo)-1])
 	s.redo = s.redo[:len(s.redo)-1]
 	return true
 }
@@ -310,12 +366,6 @@ func (s *Session) Redo() bool {
 // CanUndo and CanRedo let an interface grey out what is unavailable.
 func (s *Session) CanUndo() bool { return len(s.undo) > 0 }
 func (s *Session) CanRedo() bool { return len(s.redo) > 0 }
-
-func cloneEntries(in []Entry) []Entry {
-	out := make([]Entry, len(in))
-	copy(out, in)
-	return out
-}
 
 // --- persistence -----------------------------------------------------------
 

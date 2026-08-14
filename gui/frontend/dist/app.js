@@ -5,10 +5,10 @@ const go = () => window.go.main.App;
 const $ = (id) => document.getElementById(id);
 
 let state = null;
-let selected = -1;   // highlighted row, -1 for none
-let lastCount = 0;   // so only genuinely new rows flash
-let editing = false; // suppress global keys while a prompt is open
-let toastTimer = null;
+let selected = -1;
+let lastCount = 0;
+let editing = false;   // suppress global keys while a text box has focus
+let hintTimer = null;
 
 // ---------- rendering ----------
 
@@ -16,31 +16,31 @@ function render(s) {
   if (!s) return;
   state = s;
 
-  $("listen-dot").className = "dot " + (s.listening ? "on" : "off");
-  $("listen-dot").title = s.listening
-    ? `listening on ${s.boundPorts} ports`
-    : "not listening";
+  const btn = $("startstop");
+  btn.classList.toggle("running", s.active);
+  btn.innerHTML = s.active ? 'Stop' : 'Start <span class="glyph">&#9655;</span>';
 
-  if (!s.active) {
-    $("app").classList.add("hidden");
-    $("setup").classList.remove("hidden");
-    return;
+  // Never fight the operator for a box they are typing in.
+  if (document.activeElement !== $("column")) $("column").value = s.nextColumn || 1;
+  if (document.activeElement !== $("row")) $("row").value = s.nextRow || 1;
+  if (s.active) {
+    if (document.activeElement !== $("rack")) $("rack").value = s.rack;
+    $("can").value = s.can;
   }
-  $("setup").classList.add("hidden");
-  $("app").classList.remove("hidden");
+  $("can").disabled = s.active;
+  $("rack").disabled = s.active;
 
-  $("loc").textContent = `${s.can} · rack ${s.rack}`;
-  $("count").textContent = `${s.entries.length} of ${s.positions}`;
+  $("head-note").textContent = s.active
+    ? `${s.can} · rack ${s.rack} · ${s.entries.length} of ${s.positions} positions`
+    : "";
 
-  if (s.full) {
-    $("next-pos").textContent = "RACK DONE";
-    $("next-pos").classList.add("done");
-  } else {
-    $("next-pos").textContent = s.nextLabel || "—";
-    $("next-pos").classList.remove("done");
-  }
+  $("status-text").textContent =
+    `${s.recorded} Device${s.recorded === 1 ? "" : "s"} Connected`;
 
-  if (s.error) toast(s.error, "info");
+  if (s.error) hint(s.error, true);
+  else if (!s.listening) hint("not listening — no ports could be opened", true);
+  else if (s.full) hint("rack complete");
+
   renderRows(s);
 }
 
@@ -50,6 +50,7 @@ function renderRows(s) {
   lastCount = s.entries.length;
 
   $("empty").classList.toggle("hidden", s.entries.length > 0);
+  $("empty").style.display = s.entries.length > 0 ? "none" : "";
   body.innerHTML = "";
 
   s.entries.forEach((e, i) => {
@@ -59,8 +60,10 @@ function renderRows(s) {
     tr.onclick = () => { selected = i; renderRows(state); };
 
     tr.innerHTML = e.kind === "skipped"
-      ? `<td class="pos">${e.label}</td><td class="skip">skipped</td><td class="time"></td>`
-      : `<td class="pos">${e.label}</td><td>${esc(e.mac)}</td><td class="time">${esc(e.time)}</td>`;
+      ? `<td class="no">${i + 1}</td><td class="pos">${e.label}</td>` +
+        `<td class="skip" colspan="2">skipped</td>`
+      : `<td class="no">${i + 1}</td><td class="pos">${e.label}</td>` +
+        `<td class="mono">${esc(e.ip)}</td><td class="mono">${esc(e.mac)}</td>`;
     body.appendChild(tr);
   });
 
@@ -69,17 +72,49 @@ function renderRows(s) {
   }
 }
 
-function toast(msg, kind) {
-  const t = $("toast");
-  t.textContent = msg;
-  t.className = `toast show ${kind || "info"}`;
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { t.className = "toast"; }, 3500);
+function hint(msg, warn) {
+  const el = $("status-hint");
+  el.textContent = msg;
+  el.className = "status-hint" + (warn ? " warn" : "");
+  clearTimeout(hintTimer);
+  hintTimer = setTimeout(() => { el.textContent = ""; el.className = "status-hint"; }, 4000);
 }
 
 function esc(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+// ---------- position boxes ----------
+//
+// These are the display and the control at once: they show where the next
+// machine lands, and typing in them moves the walk without touching a row
+// already recorded.
+
+async function commitPosition() {
+  if (!state?.active) return;
+  const col = parseInt($("column").value, 10);
+  const row = parseInt($("row").value, 10);
+  if (!Number.isFinite(col) || !Number.isFinite(row)) return;
+  if (col === state.nextColumn && row === state.nextRow) return;
+
+  const s = await go().SetNextPosition(col, row);
+  const rejected = !!s.error;
+  $("column").classList.toggle("bad", rejected);
+  $("row").classList.toggle("bad", rejected);
+  render(s);
+}
+
+for (const id of ["column", "row"]) {
+  $(id).addEventListener("focus", () => { editing = true; });
+  $(id).addEventListener("blur", () => { editing = false; commitPosition(); });
+  $(id).addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter") { ev.preventDefault(); $(id).blur(); }
+  });
+}
+for (const id of ["rack", "can"]) {
+  $(id).addEventListener("focus", () => { editing = true; });
+  $(id).addEventListener("blur", () => { editing = false; });
 }
 
 // ---------- keys ----------
@@ -88,9 +123,7 @@ function esc(s) {
 // no mouse, nothing to hit accurately while holding a torch.
 
 document.addEventListener("keydown", async (ev) => {
-  if (editing) return;
-  if ($("app").classList.contains("hidden")) return;
-
+  if (editing || !state?.active) return;
   const rows = state?.entries?.length ?? 0;
 
   switch (ev.key) {
@@ -129,10 +162,6 @@ document.addEventListener("keydown", async (ev) => {
       if (selected >= 0) { ev.preventDefault(); render(await go().InsertBlankAbove(selected)); }
       break;
 
-    case "p": case "P":
-      if (selected >= 0) { ev.preventDefault(); await editPosition(selected); }
-      break;
-
     case "z": case "Z":
       if (ev.ctrlKey || ev.metaKey) { ev.preventDefault(); render(await go().Undo()); }
       break;
@@ -147,28 +176,13 @@ async function editMAC(i) {
   editing = true;
   try {
     const cur = state.entries[i]?.mac ?? "";
-    const val = window.prompt("MAC for this position (empty = skipped):", cur);
+    const val = window.prompt("MAC address for this position (empty = skipped):", cur);
     if (val === null) return;
     render(await go().SetMAC(i, val.trim()));
   } finally { editing = false; }
 }
 
-async function editPosition(i) {
-  editing = true;
-  try {
-    const e = state.entries[i];
-    const val = window.prompt(
-      `Position as column/row. Rows below renumber to follow.\n` +
-      `This rack is ${state.columns} columns by ${state.rows} rows.`,
-      `${e.column}/${e.row}`);
-    if (val === null) return;
-    const m = val.match(/^\s*(\d+)\s*[\/,\s]\s*(\d+)\s*$/);
-    if (!m) { toast(`"${val}" is not a column/row, e.g. 2/7`, "info"); return; }
-    render(await go().SetPosition(i, parseInt(m[1], 10), parseInt(m[2], 10)));
-  } finally { editing = false; }
-}
-
-// ---------- setup ----------
+// ---------- start / stop ----------
 
 async function boot() {
   const cans = await go().Cans();
@@ -179,32 +193,24 @@ async function boot() {
     sel.appendChild(o);
   });
 
-  $("start").onclick = async () => {
+  $("startstop").onclick = async () => {
+    if (state?.active) { render(await go().StopSession()); return; }
     const rack = parseInt($("rack").value, 10);
-    if (!Number.isFinite(rack) || rack < 1) {
-      $("setup-error").textContent = "Rack must be 1 or higher.";
-      return;
-    }
-    const s = await go().StartSession(sel.value, rack);
-    $("setup-error").textContent = s.error || "";
+    if (!Number.isFinite(rack) || rack < 1) { hint("rack must be 1 or higher", true); return; }
     selected = -1;
     lastCount = 0;
+    const s = await go().StartSession(sel.value, rack);
     render(s);
-  };
-
-  $("change").onclick = () => {
-    $("app").classList.add("hidden");
-    $("setup").classList.remove("hidden");
-  };
-
-  $("more-keys").onclick = () => {
-    toast("I = insert blank above · P = set position · Ctrl+Y = redo", "info");
+    if (!s.error) {
+      const col = parseInt($("column").value, 10);
+      const row = parseInt($("row").value, 10);
+      if (col > 1 || row > 1) render(await go().SetNextPosition(col, row));
+    }
   };
 
   runtime.EventsOn("captured", async () => render(await go().State()));
-  // A refused duplicate: say where it already is, and leave the position alone.
-  runtime.EventsOn("rejected", (msg) => toast(msg, "reject"));
-  runtime.EventsOn("notice", (msg) => toast(msg, "info"));
+  runtime.EventsOn("rejected", async (msg) => { hint(msg, true); render(await go().State()); });
+  runtime.EventsOn("notice", (msg) => hint(msg, true));
 
   render(await go().State());
 }

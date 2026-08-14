@@ -197,6 +197,17 @@ func (a *App) StartSession(can string, rack int) State {
 	return a.stateLocked("")
 }
 
+// StopSession ends the walk and leaves the saved file alone, so the same rack
+// can be resumed later.
+func (a *App) StopSession() State {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.save()
+	a.session = nil
+	a.lastReport = map[string]time.Time{}
+	return a.stateLocked("")
+}
+
 func (a *App) pathFor(can string, rack int) string {
 	return filepath.Join(a.sessionDir, fmt.Sprintf("%s-rack%d.json", can, rack))
 }
@@ -223,6 +234,14 @@ func (a *App) InsertBlankAbove(i int) State {
 
 func (a *App) SetMAC(i int, mac string) State {
 	return a.mutate(func(s *walk.Session) error { return s.SetMAC(i, mac) })
+}
+
+// SetNextPosition moves where the next machine will land. This is what the
+// position boxes at the top of the window write to.
+func (a *App) SetNextPosition(column, row int) State {
+	return a.mutate(func(s *walk.Session) error {
+		return s.SetNextPosition(walk.Position{Can: s.Can, Rack: s.Rack, Column: column, Row: row})
+	})
 }
 
 func (a *App) SetPosition(i, column, row int) State {
@@ -291,6 +310,9 @@ type State struct {
 	Positions  int    `json:"positions"`
 	Entries    []Row  `json:"entries"`
 	NextLabel  string `json:"nextLabel"`
+	NextColumn int    `json:"nextColumn"`
+	NextRow    int    `json:"nextRow"`
+	Recorded   int    `json:"recorded"`
 	Full       bool   `json:"full"`
 	CanUndo    bool   `json:"canUndo"`
 	CanRedo    bool   `json:"canRedo"`
@@ -339,8 +361,16 @@ func (a *App) stateLocked(errMsg string) State {
 		})
 	}
 
+	for _, e := range s.Entries {
+		if e.Kind == walk.Reported {
+			st.Recorded++
+		}
+	}
+
 	if next, ok := s.NextPosition(); ok {
 		st.NextLabel = next.Short()
+		st.NextColumn = next.Column
+		st.NextRow = next.Row
 	}
 	return st
 }
