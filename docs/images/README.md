@@ -3,12 +3,31 @@
 Drop the images here using exactly these filenames. The README already links to
 them, so they appear as soon as they are pushed — nothing else needs editing.
 
+### macOS install (already captured)
+
+| Filename | What it shows |
+|---|---|
+| `mac-01-download.png` | The Releases page, downloading the macOS zip |
+| `mac-02-applications.png` | Dragging `OpenIPReporter.app` into Applications |
+| `mac-03-blocked.png` | "Not Opened — Apple could not verify", with **Done** |
+| `mac-04-help.png` | Apple's help page and its link to Privacy & Security |
+| `mac-05-open-anyway.png` | System Settings → Security → **Open Anyway** |
+| `mac-06-confirm.png` | The confirmation dialog with **Open Anyway** |
+| `mac-07-password.png` | The Touch ID / administrator password prompt |
+
+### Windows install (still to capture)
+
 | Filename | What to capture |
 |---|---|
-| `01-smartscreen.png` | The "Windows protected your PC" dialog, **before** clicking More info |
-| `02-run-anyway.png` | Same dialog after **More info**, showing the **Run anyway** button |
-| `03-firewall.png` | The Windows Defender Firewall prompt, with **Private networks** ticked |
-| `04-app-empty.png` | The app open, before starting — Can dropdown, Rack/Row/Column, Start |
+| `win-01-smartscreen.png` | "Windows protected your PC", **before** clicking More info |
+| `win-02-run-anyway.png` | Same dialog after **More info**, showing **Run anyway** |
+| `win-03-firewall.png` | The firewall prompt, with **Private networks** ticked |
+
+### The app itself (still to capture)
+
+| Filename | What to capture |
+|---|---|
+| `04-app-empty.png` | The app open, before starting |
 | `05-walking.png` | Mid-walk with a few rows captured |
 | `06-cans.png` | The **Cans…** editor open |
 | `07-export.png` | The Save dialog from **Export CSV** |
@@ -25,7 +44,8 @@ Two safe options:
 - **Blur or block out** the IP and MAC columns before saving. Any image editor
   will do; Paint is enough.
 
-Screenshots 01–04 have no site data in them and are safe as-is.
+The `mac-*` and `win-*` install screenshots have no site data in them and are
+safe as-is. It is `05-walking.png` onwards that need care.
 
 ## Size
 

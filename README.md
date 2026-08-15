@@ -41,7 +41,7 @@ Two prompts, both expected. Screenshots of each are in
      broken-image icon, which is why they are grouped rather than inline. -->
 | SmartScreen | After "More info" | Firewall |
 |---|---|---|
-| ![SmartScreen warning](docs/images/01-smartscreen.png) | ![Run anyway](docs/images/02-run-anyway.png) | ![Firewall prompt](docs/images/03-firewall.png) |
+| ![SmartScreen warning](docs/images/win-01-smartscreen.png) | ![Run anyway](docs/images/win-02-run-anyway.png) | ![Firewall prompt](docs/images/win-03-firewall.png) |
 
 
 1. **"Windows protected your PC"** (SmartScreen). Click **More info**, then
@@ -87,11 +87,54 @@ What actually works, cheapest first:
 
 ### First run on macOS
 
-Unzip, then right-click the app → **Open** → **Open**. Gatekeeper blocks
-unsigned apps on a double-click but allows them through this path. You only do
-it once.
+Recent macOS removed the old right-click → **Open** shortcut for unsigned apps,
+so the first launch takes a few more steps than it used to. You only do this
+once.
 
-For the command-line tool, which is a bare binary rather than an app bundle:
+**If you are comfortable in Terminal, this replaces every step below:**
+
+```bash
+xattr -dr com.apple.quarantine /Applications/OpenIPReporter.app
+```
+
+Then open it normally. Otherwise:
+
+**1. Download `OpenIPReporter-macos-arm64.zip`** from the Releases page.
+
+![Downloading the release](docs/images/mac-01-download.png)
+
+**2. Unzip it and drag `OpenIPReporter.app` into Applications.**
+
+![Dragging to Applications](docs/images/mac-02-applications.png)
+
+**3. Open it.** macOS refuses the first time. This is the unsigned-app warning,
+not a malware detection — see [Why the warning appears](#why-the-warning-appears).
+Click **Done**, *not* Move to Trash.
+
+![Blocked on first launch](docs/images/mac-03-blocked.png)
+
+**4. Open Privacy & Security settings.** The quickest route is the **?** button
+on that dialog, which opens Apple's help page with a link straight to the right
+settings pane. Or go to  → System Settings → Privacy & Security yourself.
+
+![Apple's help page](docs/images/mac-04-help.png)
+
+**5. Scroll to Security.** There is a line saying OpenIPReporter was blocked,
+with an **Open Anyway** button.
+
+![Open Anyway in settings](docs/images/mac-05-open-anyway.png)
+
+**6. Confirm with Open Anyway**, then authenticate with Touch ID or an
+administrator password.
+
+| Confirm | Authenticate |
+|---|---|
+| ![Confirm dialog](docs/images/mac-06-confirm.png) | ![Password prompt](docs/images/mac-07-password.png) |
+
+From then on it opens by double-clicking like anything else.
+
+**The command-line tool** is a bare binary rather than an app bundle, so it
+needs the executable bit too:
 
 ```bash
 chmod +x capture-tool-macos-arm64
