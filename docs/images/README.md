@@ -84,6 +84,24 @@ The Windows prompts cannot be made to match the app window — Windows decides
 their size. That is why the README puts them side by side in a table, where
 differing sizes stop mattering.
 
+## Getting them in here
+
+Screenshot tools name files by timestamp, so a folder of captures already sorts
+into the order they were taken — which is the order of the steps. `import.sh`
+uses that to do the renaming:
+
+```bash
+./docs/images/import.sh ~/Desktop mac            # shows what it would do
+./docs/images/import.sh ~/Desktop mac --apply    # does it, then resizes
+```
+
+The sets are `mac` (9), `win` (4) and `app` (4). It changes nothing without
+`--apply`, so the order can be checked first — getting it wrong produces an
+install guide that confidently shows the wrong step.
+
+Point it at a folder holding only that one set. If the count does not match
+what the set expects, it says so rather than guessing.
+
 ## Taking them
 
 - **Windows:** <kbd>Win</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd> to snip, or
