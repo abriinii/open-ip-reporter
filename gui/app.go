@@ -58,6 +58,7 @@ type App struct {
 	version      string
 	updateRepo   string
 	latest       *update.Release
+	updateState  string
 	layout       site.Site
 }
 
@@ -79,6 +80,10 @@ func NewApp() *App {
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	a.loadLayout()
+	// Kicked from Go rather than waiting for the window to ask. The result is
+	// kept in State, so it is picked up on an ordinary render even if the
+	// event never arrives.
+	go a.checkForUpdate()
 	a.startListening()
 }
 
@@ -317,34 +322,44 @@ func (a *App) CheckForUpdate() {
 	go a.checkForUpdate()
 }
 
+// newChecker is a variable so tests can point the check at a stub instead of
+// GitHub.
+var newChecker = update.NewChecker
+
 func (a *App) checkForUpdate() {
+	set := func(state string) {
+		a.mu.Lock()
+		a.updateState = state
+		a.mu.Unlock()
+		// Best effort only. The window may not be listening yet, which is
+		// exactly why the state above is what actually matters.
+		a.emit("update-status", state)
+	}
+
 	if on := a.loadSettings().CheckForUpdates; on == nil || !*on {
-		a.emit("update-status", map[string]any{"state": "off"})
+		set("off")
 		return
 	}
 	if a.version == "" || a.version == "dev" {
-		a.emit("update-status", map[string]any{"state": "dev"})
+		set("dev")
 		return
 	}
 
-	a.emit("update-status", map[string]any{"state": "checking"})
+	set("checking")
 
-	rel, err := update.NewChecker(a.updateRepo).Check(context.Background(), a.version)
+	rel, err := newChecker(a.updateRepo).Check(context.Background(), a.version)
 	switch {
 	case err != nil:
 		// Being unreachable is the normal case on a miner network, so this is
 		// reported plainly rather than as a fault.
-		a.emit("update-status", map[string]any{"state": "unreachable"})
+		set("unreachable")
 	case rel == nil:
-		a.emit("update-status", map[string]any{"state": "current"})
+		set("current")
 	default:
 		a.mu.Lock()
 		a.latest = rel
 		a.mu.Unlock()
-		a.emit("update-status", map[string]any{
-			"state": "available", "version": rel.Version,
-			"notes": rel.Notes, "url": rel.URL,
-		})
+		set("available")
 	}
 }
 
@@ -586,36 +601,46 @@ type Row struct {
 
 // State is a complete snapshot of the walk for the frontend to render.
 type State struct {
-	Active     bool   `json:"active"`     // a walk is in progress
-	HasSession bool   `json:"hasSession"` // a rack is loaded, walking or not
-	Can        string `json:"can"`
-	Rack       int    `json:"rack"`
-	Rows       int    `json:"rows"`
-	Columns    int    `json:"columns"`
-	Positions  int    `json:"positions"`
-	Entries    []Row  `json:"entries"`
-	NextLabel  string `json:"nextLabel"`
-	NextColumn int    `json:"nextColumn"`
-	NextRow    int    `json:"nextRow"`
-	Recorded   int    `json:"recorded"`
-	Exported   string `json:"exported"`
-	Version    string `json:"version"`
-	Copied     string `json:"copied"` // what just went on the clipboard, for confirmation
-	Full       bool   `json:"full"`
-	CanUndo    bool   `json:"canUndo"`
-	CanRedo    bool   `json:"canRedo"`
-	Listening  bool   `json:"listening"`
-	BoundPorts int    `json:"boundPorts"`
-	Error      string `json:"error"`
+	Active        bool   `json:"active"`     // a walk is in progress
+	HasSession    bool   `json:"hasSession"` // a rack is loaded, walking or not
+	Can           string `json:"can"`
+	Rack          int    `json:"rack"`
+	Rows          int    `json:"rows"`
+	Columns       int    `json:"columns"`
+	Positions     int    `json:"positions"`
+	Entries       []Row  `json:"entries"`
+	NextLabel     string `json:"nextLabel"`
+	NextColumn    int    `json:"nextColumn"`
+	NextRow       int    `json:"nextRow"`
+	Recorded      int    `json:"recorded"`
+	Exported      string `json:"exported"`
+	Version       string `json:"version"`
+	UpdateState   string `json:"updateState"`
+	LatestVersion string `json:"latestVersion"`
+	LatestNotes   string `json:"latestNotes"`
+	Copied        string `json:"copied"` // what just went on the clipboard, for confirmation
+	Full          bool   `json:"full"`
+	CanUndo       bool   `json:"canUndo"`
+	CanRedo       bool   `json:"canRedo"`
+	Listening     bool   `json:"listening"`
+	BoundPorts    int    `json:"boundPorts"`
+	Error         string `json:"error"`
 }
 
 func (a *App) stateLocked(errMsg string) State {
 	st := State{
-		Listening:  a.listening,
-		BoundPorts: a.boundPorts,
-		Exported:   a.exported,
-		Version:    a.version,
-		Error:      errMsg,
+		Listening:   a.listening,
+		BoundPorts:  a.boundPorts,
+		Exported:    a.exported,
+		Version:     a.version,
+		UpdateState: a.updateState,
+		Error:       errMsg,
+	}
+	// Before the early return on purpose: at launch there is no rack loaded,
+	// and that is exactly when the update notice needs its version and notes.
+	if a.latest != nil {
+		st.LatestVersion = a.latest.Version
+		st.LatestNotes = a.latest.Notes
 	}
 	if a.session == nil {
 		return st

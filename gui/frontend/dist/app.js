@@ -65,6 +65,7 @@ function render(s) {
   else if (!s.listening) hint("not listening — no ports could be opened", true);
   else if (s.exported) hint(`exported ${s.exported}`);
 
+  applyUpdateState(s.updateState, s);
   setVersionLine();
   renderRows(s);
 }
@@ -425,6 +426,10 @@ const TOAST_MIN_MS = 1100;
 let checkStarted = 0;
 let updateState = { state: "" };
 
+function latestFromState() {
+  return { version: state?.latestVersion, notes: state?.latestNotes, url: "" };
+}
+
 function setVersionLine() {
   const v = state?.version && state.version !== "dev" ? state.version : "dev build";
   const el = $("version-line");
@@ -436,8 +441,8 @@ function setVersionLine() {
       el.innerHTML = `${esc(v)} · <span class="ok">up to date</span>`;
       break;
     case "available":
-      el.innerHTML = `${esc(v)} · <span class="stale" id="version-update">${esc(updateState.version)} available</span>`;
-      $("version-update").onclick = () => showUpdate(updateState);
+      el.innerHTML = `${esc(v)} · <span class="stale" id="version-update">${esc(updateState.version || state?.latestVersion || "update")} available</span>`;
+      $("version-update").onclick = () => showUpdate(latestFromState());
       break;
     case "unreachable":
       el.innerHTML = `${esc(v)} · offline`;
@@ -466,6 +471,16 @@ function afterMinimum(fn) {
   setTimeout(fn, Math.max(0, TOAST_MIN_MS - waited));
 }
 
+// Called both from the State snapshot and from the event, whichever arrives.
+// Repeats of the same state are ignored so a re-render cannot restart a toast.
+let lastAppliedState = "";
+
+function applyUpdateState(stateName, s) {
+  if (!stateName || stateName === lastAppliedState) return;
+  lastAppliedState = stateName;
+  onUpdateStatus({ ...(s || {}), state: stateName });
+}
+
 function onUpdateStatus(s) {
   updateState = s || { state: "" };
   switch (s.state) {
@@ -489,7 +504,7 @@ function onUpdateStatus(s) {
       afterMinimum(() => {
         $("toast").classList.add("hidden");
         setVersionLine();
-        showUpdate(s);
+        showUpdate(s.version ? s : latestFromState());
       });
       break;
 
@@ -552,7 +567,8 @@ async function boot() {
     }
   };
 
-  runtime.EventsOn("update-status", onUpdateStatus);
+  runtime.EventsOn("update-status", (st) =>
+    applyUpdateState(typeof st === "string" ? st : st && st.state, state));
   runtime.EventsOn("captured", async () => render(await call("State")));
   runtime.EventsOn("rejected", async (msg) => { hint(msg, true); render(await call("State")); });
   runtime.EventsOn("notice", (msg) => hint(msg, true));
@@ -560,9 +576,15 @@ async function boot() {
   render(await call("State"));
   setVersionLine();
 
-  // Last, and only now: the handlers above have to exist before the reply can
-  // arrive, or a fast answer lands with nothing listening and is lost.
-  call("CheckForUpdate");
+  // The check runs in Go from startup. Refresh a few times over the next few
+  // seconds so its result is shown even if the event never arrives: without
+  // this, nothing else would trigger a render until the first capture.
+  for (const delay of [400, 1200, 2500, 5000]) {
+    setTimeout(async () => {
+      const s = await call("State");
+      if (s) render(s);
+    }, delay);
+  }
 }
 
 window.addEventListener("DOMContentLoaded", boot);

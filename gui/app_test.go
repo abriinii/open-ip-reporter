@@ -12,6 +12,7 @@ import (
 	"openipreporter/internal/capture"
 	"openipreporter/internal/export"
 	"openipreporter/internal/site"
+	"openipreporter/internal/update"
 )
 
 func newTestApp(t *testing.T) *App {
@@ -439,5 +440,61 @@ func TestDevBuildDoesNotCheck(t *testing.T) {
 	a.checkForUpdate() // would panic on a nil ctx if it tried to emit
 	if a.latest != nil {
 		t.Error("a dev build reported an update")
+	}
+}
+
+// The update status has to survive on State alone. Relying on the event is
+// what shipped twice as a feature that silently did nothing, because a
+// dropped event leaves no trace anywhere.
+func TestUpdateStatusIsVisibleInStateWithoutAnyEvent(t *testing.T) {
+	a := newTestApp(t)
+	a.settingsPath = filepath.Join(t.TempDir(), "settings.json")
+	a.ctx = nil // no window: every emit is a no-op, as on a real launch race
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"tag_name":"v9.9.9","body":"Notes here.","html_url":"https://example.test"}`))
+	}))
+	defer srv.Close()
+
+	a.version = "v1.0.0"
+	a.updateRepo = "x/y"
+	// Point the checker at the stub rather than GitHub.
+	origNew := newChecker
+	newChecker = func(repo string) *update.Checker {
+		c := update.NewChecker(repo)
+		c.BaseURL = srv.URL
+		c.Client = srv.Client()
+		return c
+	}
+	defer func() { newChecker = origNew }()
+
+	a.checkForUpdate()
+
+	st := a.State()
+	if st.UpdateState != "available" {
+		t.Fatalf("UpdateState = %q, want \"available\" — the window has no other way to know", st.UpdateState)
+	}
+	if st.LatestVersion != "v9.9.9" || st.LatestNotes != "Notes here." {
+		t.Errorf("State carries %q / %q", st.LatestVersion, st.LatestNotes)
+	}
+}
+
+func TestUpdateStateReportsBeingOffline(t *testing.T) {
+	a := newTestApp(t)
+	a.settingsPath = filepath.Join(t.TempDir(), "settings.json")
+	a.version = "v1.0.0"
+	a.updateRepo = "x/y"
+	origNew := newChecker
+	newChecker = func(repo string) *update.Checker {
+		c := update.NewChecker(repo)
+		c.BaseURL = "http://127.0.0.1:1" // nothing listening
+		c.Client = &http.Client{Timeout: time.Second}
+		return c
+	}
+	defer func() { newChecker = origNew }()
+
+	a.checkForUpdate()
+	if got := a.State().UpdateState; got != "unreachable" {
+		t.Errorf("UpdateState = %q, want \"unreachable\"", got)
 	}
 }

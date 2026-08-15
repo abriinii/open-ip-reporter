@@ -68,14 +68,13 @@ func TestEveryFrontendCallExists(t *testing.T) {
 func TestFeaturesAreActuallyWiredUp(t *testing.T) {
 	js := frontend(t)
 	required := map[string]string{
-		`call("CheckForUpdate")`: "the update check never runs, so no notice and no version status",
-		`call("Layout")`:         "the Cans editor opens empty",
-		`call("SaveLayout"`:      "the Cans editor cannot save",
-		`call("Skip")`:           "the spacebar does nothing",
-		`call("Export")`:         "the Export button does nothing",
-		`call("Undo")`:           "undo does nothing",
-		`call("CopyIP"`:          "copying an IP does nothing",
-		`call("CopyMAC"`:         "copying a MAC does nothing",
+		`call("Layout")`:    "the Cans editor opens empty",
+		`call("SaveLayout"`: "the Cans editor cannot save",
+		`call("Skip")`:      "the spacebar does nothing",
+		`call("Export")`:    "the Export button does nothing",
+		`call("Undo")`:      "undo does nothing",
+		`call("CopyIP"`:     "copying an IP does nothing",
+		`call("CopyMAC"`:    "copying a MAC does nothing",
 	}
 	for snippet, consequence := range required {
 		if !strings.Contains(js, snippet) {
