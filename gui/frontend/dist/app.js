@@ -509,7 +509,7 @@ function setVersionLine() {
     case "current": {
       // Clickable when notes came back with the check, so the notes for the
       // version in front of you can be read without falling behind first.
-      const notes = state?.latestNotes;
+      const notes = state?.latestVersion;
       el.innerHTML = notes
         ? `${esc(v)} · <span class="stale ok" id="version-notes">up to date</span>`
         : `${esc(v)} · <span class="ok">up to date</span>`;
@@ -594,6 +594,33 @@ function onUpdateStatus(s) {
   }
 }
 
+// The check runs in Go from startup, and nothing else triggers a render until
+// the first capture, so its result has to be collected here.
+//
+// This waits for an answer rather than sampling a few fixed times. A fixed
+// schedule stopped after five seconds, and on a slower connection the reply
+// landed after the last sample: the status was right but the version and notes
+// behind it were still empty, so the notice would not open and the link did
+// nothing until something else forced a render.
+async function pollUpdateStatus() {
+  const settled = new Set(["current", "available", "unreachable", "off", "dev"]);
+
+  for (let i = 0; i < 60; i++) {
+    const s = await call("State");
+    if (s) {
+      render(s);
+      const st = s.updateState;
+      if (settled.has(st)) {
+        // current and available also carry a version and notes; without those
+        // there is nothing to show yet, so keep waiting for them.
+        const needsDetail = st === "current" || st === "available";
+        if (!needsDetail || s.latestVersion) return;
+      }
+    }
+    await new Promise((r) => setTimeout(r, i < 8 ? 400 : 1500));
+  }
+}
+
 // ---------- update notice ----------
 //
 // Shown only when a newer release actually exists, which is rare. The app
@@ -613,9 +640,15 @@ function showNotes() {
   prompting = true;
 }
 
-function showUpdate(rel) {
+async function showUpdate(rel) {
   rel = rel || latestFromState();
-  if (!rel.version) return;
+  if (!rel.version) {
+    // The details may still be on their way. Ask once rather than doing
+    // nothing, which is what made the button look broken.
+    const s = await call("State");
+    if (s) { state = s; rel = latestFromState(); }
+    if (!rel.version) { hint("still checking, try again in a moment"); return; }
+  }
   $("up-title").textContent = `Version ${rel.version} is available`;
   $("up-never").parentElement.classList.remove("hidden");
   $("up-open").classList.remove("hidden");
@@ -699,15 +732,7 @@ async function boot() {
   render(await call("State"));
   setVersionLine();
 
-  // The check runs in Go from startup. Refresh a few times over the next few
-  // seconds so its result is shown even if the event never arrives: without
-  // this, nothing else would trigger a render until the first capture.
-  for (const delay of [400, 1200, 2500, 5000]) {
-    setTimeout(async () => {
-      const s = await call("State");
-      if (s) render(s);
-    }, delay);
-  }
+  pollUpdateStatus();
 }
 
 window.addEventListener("DOMContentLoaded", boot);
