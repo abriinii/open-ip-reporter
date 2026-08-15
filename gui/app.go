@@ -53,6 +53,7 @@ type App struct {
 	listenDone <-chan struct{}
 
 	sessionDir   string
+	dataDir      string
 	cansPath     string
 	settingsPath string
 	version      string
@@ -63,12 +64,15 @@ type App struct {
 }
 
 func NewApp() *App {
+	dir := dataDir()
+	migrateFromWorkingDir(dir)
 	return &App{
 		lastReport:   map[string]time.Time{},
 		unknown:      map[int]int{},
-		sessionDir:   "sessions",
-		cansPath:     "cans.json",
-		settingsPath: "settings.json",
+		dataDir:      dir,
+		sessionDir:   filepath.Join(dir, "sessions"),
+		cansPath:     filepath.Join(dir, "cans.json"),
+		settingsPath: filepath.Join(dir, "settings.json"),
 		updateRepo:   "abriinii/open-ip-reporter",
 		// Seeded so the app is usable before startup has read the file, and so
 		// a failure to read it later degrades to the defaults rather than to an

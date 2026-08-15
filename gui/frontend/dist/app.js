@@ -388,6 +388,7 @@ function closeCans() {
   prompting = false;
 }
 
+$("showfiles").onclick = (ev) => { ev.preventDefault(); call("OpenDataFolder"); };
 $("editcans").onclick = openCans;
 $("cans-cancel").onclick = closeCans;
 $("cans-save").onclick = async () => {

@@ -365,3 +365,5 @@ td.note { color: var(--text-2); white-space: nowrap; overflow: hidden; text-over
 @media (prefers-color-scheme: dark) { :root { --good: #6ccf74; } }
 
 .never.hidden, .primary-sm.hidden { display: none !important; }
+
+.dlg-head a { color: var(--accent); text-decoration: underline; cursor: pointer; }

@@ -196,8 +196,18 @@ fires on a genuine repeat.
 
 ### Nothing is lost if the laptop sleeps
 
-The walk is saved to `sessions/` after every capture. Starting the same can and
-rack again picks up where it left off.
+The walk is saved after every capture. Starting the same can and rack again
+picks up where it left off.
+
+Walks, the can list and preferences are kept together, away from wherever the
+program was launched from:
+
+```
+Windows   %APPDATA%\OpenIPReporter
+macOS     ~/Library/Application Support/OpenIPReporter
+```
+
+**Cans… → Show the folder** opens it.
 
 ---
 
@@ -237,10 +247,10 @@ dropdown to add, edit or remove cans and set the rack shape for each one.
 
 ![The Cans editor](docs/images/06-cans.png)
 
-It is saved as `cans.json` next to the app, so setting up a second machine is a
-matter of copying that one file across. A fresh install writes the list below
-as a starting point; replacing it entirely is the expected thing to do
-somewhere else.
+It is saved as `cans.json`, so setting up a second machine is a matter of
+copying that one file across. **Show the folder** in that dialog opens the
+right place. A fresh install writes the list below as a starting point;
+replacing it entirely is the expected thing to do somewhere else.
 
 One thing that does not travel: the can is normally inferred from a report's
 source address using this site's addressing scheme. Somewhere addressed

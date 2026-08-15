@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -496,5 +497,83 @@ func TestUpdateStateReportsBeingOffline(t *testing.T) {
 	a.checkForUpdate()
 	if got := a.State().UpdateState; got != "unreachable" {
 		t.Errorf("UpdateState = %q, want \"unreachable\"", got)
+	}
+}
+
+// Nothing may be written next to the executable. Running from Downloads used
+// to scatter files there, and the sessions folder holds walks in progress —
+// tidying it away loses real work.
+func TestNothingIsWrittenToTheWorkingDirectory(t *testing.T) {
+	dir := t.TempDir()
+	a := NewApp()
+	a.dataDir = dir
+	a.sessionDir = filepath.Join(dir, "sessions")
+	a.cansPath = filepath.Join(dir, "cans.json")
+	a.settingsPath = filepath.Join(dir, "settings.json")
+
+	a.loadLayout()
+	a.SaveLayout([]site.Can{{Name: "B1", Rows: 10, Columns: 5}})
+	a.SetCheckForUpdates(false)
+	a.StartSession("B1", 1)
+	a.onPacket(antminerPacket("21.1.1.43", "02:81:f5:ea:e1:db", time.Now()))
+
+	for _, stray := range []string{"cans.json", "settings.json", "sessions"} {
+		if _, err := os.Stat(stray); err == nil {
+			os.RemoveAll(stray)
+			t.Errorf("%s was written beside the executable", stray)
+		}
+	}
+	for _, want := range []string{"cans.json", "settings.json", "sessions"} {
+		if _, err := os.Stat(filepath.Join(dir, want)); err != nil {
+			t.Errorf("%s missing from the data folder: %v", want, err)
+		}
+	}
+}
+
+// Upgrading must not look like the can list and an unfinished walk vanished.
+func TestFilesFromOlderVersionsAreMovedAcross(t *testing.T) {
+	old := t.TempDir()
+	cwd, _ := os.Getwd()
+	if err := os.Chdir(old); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chdir(cwd)
+
+	os.WriteFile("cans.json", []byte(`{"cans":[{"name":"Shed","rows":4,"columns":3}]}`), 0o644)
+	os.MkdirAll("sessions", 0o755)
+	os.WriteFile(filepath.Join("sessions", "Shed-rack1.json"), []byte("{}"), 0o644)
+
+	dst := t.TempDir()
+	migrateFromWorkingDir(dst)
+
+	for _, name := range []string{"cans.json", "sessions"} {
+		if _, err := os.Stat(filepath.Join(dst, name)); err != nil {
+			t.Errorf("%s was not carried across: %v", name, err)
+		}
+		if _, err := os.Stat(name); err == nil {
+			t.Errorf("%s was left behind as well", name)
+		}
+	}
+}
+
+// A file already in the data folder must win; the stale copy beside the
+// executable is the older one.
+func TestMigrationNeverOverwrites(t *testing.T) {
+	old := t.TempDir()
+	cwd, _ := os.Getwd()
+	os.Chdir(old)
+	defer os.Chdir(cwd)
+
+	os.WriteFile("cans.json", []byte(`{"cans":[{"name":"Stale","rows":1,"columns":1}]}`), 0o644)
+
+	dst := t.TempDir()
+	keep := []byte(`{"cans":[{"name":"Current","rows":10,"columns":5}]}`)
+	os.WriteFile(filepath.Join(dst, "cans.json"), keep, 0o644)
+
+	migrateFromWorkingDir(dst)
+
+	got, _ := os.ReadFile(filepath.Join(dst, "cans.json"))
+	if string(got) != string(keep) {
+		t.Errorf("the current can list was overwritten by an older one: %s", got)
 	}
 }
