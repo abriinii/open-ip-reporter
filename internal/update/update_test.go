@@ -59,6 +59,9 @@ func TestCheckReportsANewerRelease(t *testing.T) {
 	if rel == nil {
 		t.Fatal("no release reported, want v2.3.0")
 	}
+	if !rel.Newer {
+		t.Error("v2.3.0 not marked newer than v2.2.0")
+	}
 	if rel.Version != "v2.3.0" || rel.URL != "https://example.test/r/v2.3.0" {
 		t.Errorf("got %+v", rel)
 	}
@@ -67,12 +70,23 @@ func TestCheckReportsANewerRelease(t *testing.T) {
 	}
 }
 
-func TestCheckSaysNothingWhenUpToDate(t *testing.T) {
+// Still reported when up to date, so the notes for the running version can be
+// read without having to fall behind first. Newer is what distinguishes them.
+func TestCheckStillReportsTheReleaseWhenUpToDate(t *testing.T) {
 	for _, tag := range []string{"v2.2.0", "v2.1.0"} {
-		c := serve(t, 200, `{"tag_name":"`+tag+`"}`)
+		c := serve(t, 200, `{"tag_name":"`+tag+`","body":"Notes."}`)
 		rel, err := c.Check(context.Background(), "v2.2.0")
-		if err != nil || rel != nil {
-			t.Errorf("tag %s: got %+v, %v; want nothing", tag, rel, err)
+		if err != nil {
+			t.Fatalf("tag %s: %v", tag, err)
+		}
+		if rel == nil {
+			t.Fatalf("tag %s: nothing reported", tag)
+		}
+		if rel.Newer {
+			t.Errorf("tag %s marked newer than v2.2.0", tag)
+		}
+		if rel.Notes != "Notes." {
+			t.Errorf("tag %s: notes = %q", tag, rel.Notes)
 		}
 	}
 }

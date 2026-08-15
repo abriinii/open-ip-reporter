@@ -24,11 +24,13 @@ import (
 // case is not "slow" but "never answers" — and that must not be noticeable.
 const timeout = 4 * time.Second
 
-// Release is a published version newer than the one running.
+// Release is the latest published version, whether or not it is newer than the
+// one running.
 type Release struct {
 	Version string `json:"version"` // e.g. "v2.3.0"
 	Notes   string `json:"notes"`   // the release body, as written on the tag
 	URL     string `json:"url"`     // where a human goes to get it
+	Newer   bool   `json:"newer"`   // true when it is ahead of the running build
 }
 
 // Checker looks up the latest release. The API base is a field so tests can
@@ -48,9 +50,15 @@ func NewChecker(repo string) *Checker {
 	}
 }
 
-// Check returns the latest release when it is newer than current, and nil when
-// it is not. A network failure is returned as an error for logging, but callers
-// are expected to ignore it: being offline is normal here, not a fault.
+// Check returns the latest published release, with Newer saying whether it is
+// ahead of the running build.
+//
+// It deliberately reports the release even when the running build is already
+// current, so the notes for the version in front of you can be read without
+// having to be out of date first.
+//
+// A network failure is returned as an error for logging, but callers are
+// expected to ignore it: being offline is normal here, not a fault.
 func (c *Checker) Check(ctx context.Context, current string) (*Release, error) {
 	// A locally built binary has no version to compare against, and telling a
 	// developer their own build is out of date is noise.
@@ -92,14 +100,12 @@ func (c *Checker) Check(ctx context.Context, current string) (*Release, error) {
 	if body.Draft || body.Prerelease || body.TagName == "" {
 		return nil, nil
 	}
-	if !Newer(body.TagName, current) {
-		return nil, nil
-	}
 
 	return &Release{
 		Version: body.TagName,
 		Notes:   strings.TrimSpace(body.Body),
 		URL:     body.HTMLURL,
+		Newer:   Newer(body.TagName, current),
 	}, nil
 }
 

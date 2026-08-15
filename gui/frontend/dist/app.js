@@ -437,9 +437,16 @@ function setVersionLine() {
     case "checking":
       el.innerHTML = `${esc(v)} · checking…`;
       break;
-    case "current":
-      el.innerHTML = `${esc(v)} · <span class="ok">up to date</span>`;
+    case "current": {
+      // Clickable when notes came back with the check, so the notes for the
+      // version in front of you can be read without falling behind first.
+      const notes = state?.latestNotes;
+      el.innerHTML = notes
+        ? `${esc(v)} · <span class="stale ok" id="version-notes">up to date</span>`
+        : `${esc(v)} · <span class="ok">up to date</span>`;
+      if (notes) $("version-notes").onclick = () => showNotes();
       break;
+    }
     case "available":
       el.innerHTML = `${esc(v)} · <span class="stale" id="version-update">${esc(updateState.version || state?.latestVersion || "update")} available</span>`;
       $("version-update").onclick = () => showUpdate(latestFromState());
@@ -519,10 +526,28 @@ function onUpdateStatus(s) {
 // Shown only when a newer release actually exists, which is rare. The app
 // never downloads or installs anything; this is a notification and a link.
 
+// The notes for the version already running: same dialog, nothing to install.
+function showNotes() {
+  const v = state?.latestVersion || state?.version || "";
+  $("up-title").textContent = `What's new in ${v}`;
+  $("up-current").textContent = "You are running this version already.";
+  $("up-notes").textContent = state?.latestNotes || "No release notes were published for this version.";
+  $("up-never").parentElement.classList.add("hidden");
+  $("up-open").classList.add("hidden");
+  $("up-later").textContent = "Close";
+  $("updatedlg").classList.remove("hidden");
+  prompting = true;
+}
+
 function showUpdate(rel) {
   if (!rel || !rel.version) return;
-  $("up-version").textContent = rel.version;
-  $("up-current").textContent = state?.version || "an older version";
+  $("up-title").textContent = `Version ${rel.version} is available`;
+  $("up-never").parentElement.classList.remove("hidden");
+  $("up-open").classList.remove("hidden");
+  $("up-later").textContent = "Later";
+  $("up-current").textContent =
+    `You are running ${state?.version || "an older version"}. Nothing is downloaded or ` +
+    `installed by this app — the button opens the release page in your browser.`;
   $("up-notes").textContent = rel.notes || "No release notes were published for this version.";
   $("up-never").checked = false;
   $("updatedlg").classList.remove("hidden");

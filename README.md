@@ -34,7 +34,15 @@ in before suspecting the software.**
 
 ### First run on Windows
 
-Two prompts, both expected:
+Two prompts, both expected. Screenshots of each are in
+[`docs/images`](docs/images) once uploaded:
+
+<!-- These render as soon as the files are pushed; until then GitHub shows a
+     broken-image icon, which is why they are grouped rather than inline. -->
+| SmartScreen | After "More info" | Firewall |
+|---|---|---|
+| ![SmartScreen warning](docs/images/01-smartscreen.png) | ![Run anyway](docs/images/02-run-anyway.png) | ![Firewall prompt](docs/images/03-firewall.png) |
+
 
 1. **"Windows protected your PC"** (SmartScreen). Click **More info**, then
    **Run anyway**. See [Why the warning appears](#why-the-warning-appears) —
@@ -96,6 +104,8 @@ Worth it only if this gets handed to people who should not have to be told.
 ---
 
 ## Walking a rack
+
+![The app mid-walk](docs/images/05-walking.png)
 
 1. Pick the **Can** and **Rack**, press **Start**.
 2. Walk. Press each miner's IP-report button; the row appears on its own. No
@@ -179,6 +189,8 @@ because that would make an unfinished walk look finished.
 
 The can list is not baked into the program. Press **Cans…** next to the can
 dropdown to add, edit or remove cans and set the rack shape for each one.
+
+![The Cans editor](docs/images/06-cans.png)
 
 It is saved as `cans.json` next to the app, so setting up a second machine is a
 matter of copying that one file across. A fresh install writes the list below
@@ -284,9 +296,9 @@ appears in the corner while it checks, and the running version sits in the
 bottom-right of the status bar with the result next to it:
 
 ```
-v2.3.0 · up to date        checked and current
-v2.3.0 · offline           no route to the internet, which is normal in a can
-v2.3.0 · v2.4.0 available  click it to see the release notes again
+v2.5.0 · up to date        checked and current — click it to read the notes
+v2.5.0 · offline           no route to the internet, which is normal in a can
+v2.5.0 · v2.6.0 available  click it to see the release notes again
 ```
 
 If a newer version exists you get its release notes. It never downloads or

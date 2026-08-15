@@ -356,10 +356,16 @@ func (a *App) checkForUpdate() {
 	case rel == nil:
 		set("current")
 	default:
+		// Kept either way: the notes for the version already installed are
+		// worth being able to read without first falling behind.
 		a.mu.Lock()
 		a.latest = rel
 		a.mu.Unlock()
-		set("available")
+		if rel.Newer {
+			set("available")
+		} else {
+			set("current")
+		}
 	}
 }
 
