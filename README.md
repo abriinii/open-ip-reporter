@@ -1,12 +1,12 @@
 # OpenIPReporter
 
-An open-source replacement for Bitmain's IP Reporter, for building
-**serial → MAC → physical position** maps during a rack walk.
+An open-source alternative to Bitmain's IP Reporter for building
+**serial → MAC → position** maps during a rack walk.
 
-The thing it does that the vendor tool does not: **it records the physical
-position with every captured report**, so serial/MAC correlation is a direct
-join instead of an assumption that row *n* of a CSV is grid position *n*. One
-missed machine no longer silently shifts every pairing after it.
+The thing it does that the vendor tool does not is record the physical position
+with every captured report, serial/MAC correlation being a direct join rather
+than an assumption that row N of a CSV is grid position N. One missed machine
+no longer silently shifts every pairing after it.
 
 ![OpenIPReporter](docs/images/04-app-empty.png)
 
@@ -14,8 +14,8 @@ missed machine no longer silently shifts every pairing after it.
 
 ## Which file do I download?
 
-Go to the [**Releases**](../../releases/latest) page. There are two different
-programs there — you almost certainly want the first one.
+Go to the [**Releases**](../../releases/latest) page. There are two programs
+there — you almost certainly want the first one.
 
 | Download this | If you want |
 |---|---|
@@ -24,15 +24,15 @@ programs there — you almost certainly want the first one.
 
 Nothing to install either way. One file, download and run.
 
-**The laptop must be plugged into the switch in the can you are walking.** The
-reports are layer-2 UDP broadcasts. They do not cross a router, a VPN, or a
-Tailscale subnet route — only a machine on that segment can hear them.
+**The laptop must be plugged into the switch in the can you are walking.**
+Reports are layer-2 UDP broadcasts. They will not traverse a router, a VPN, or
+a Tailscale subnet route — only hosts on that segment will receive them.
 
 This bites hardest with Whatsminers. Antminer reports may still reach a desk
-elsewhere on site depending on how the network is bridged, which makes it look
-as though the tool works from anywhere; Whatsminers will simply never arrive.
-**If one miner type reports and another does not, check where you are plugged
-in before suspecting the software.**
+elsewhere on site depending on your network setup, which makes it look as
+though the tool works from anywhere; Whatsminers will simply never arrive. **If
+you see one type of miner reporting and the other not, check your patch panel
+first.**
 
 ### First run on Windows
 
@@ -67,35 +67,22 @@ already exists — which is why there is no screenshot of it here.
 ### Why the warning appears
 
 SmartScreen is not saying the file is malicious. It is saying it has no
-*reputation* — it has not been downloaded enough times for Microsoft to have an
+reputation — it has not been downloaded enough times for Microsoft to have an
 opinion about it. A tool used by one site will never accumulate that.
 
-Worth knowing before spending money on it: **code signing no longer removes
-this.** EV certificates used to bypass SmartScreen on first download, and
-[Microsoft removed that behaviour in 2024](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/code-signing-options).
-Signed files now build reputation exactly like unsigned ones. Paying for a
-certificate would change the publisher shown in the dialog, not remove it.
+Two ways to avoid it:
 
-What actually works, cheapest first:
-
-- **Copy it from an internal share or a USB stick instead of downloading it in
-  a browser.** The prompt is triggered by the Mark of the Web, a tag browsers
+- **Copy it from an internal share or a USB stick** instead of downloading it
+  in a browser. The prompt is triggered by the Mark of the Web, a tag browsers
   attach to downloaded files. Files copied from a file share or removable media
-  usually do not carry it, and no prompt appears. For an internally distributed
-  tool this is the whole fix.
+  usually do not carry it.
 - **Unblock an already-downloaded copy:** right-click → **Properties** → tick
-  **Unblock** → **OK**. Same effect, one file at a time.
-- **Deploy a certificate to your own machines.** If the fleet is managed with
-  Group Policy or Intune, IT can trust a self-signed certificate across it and
-  the warning stops entirely on those machines. Only worth it for wider rollout.
-- **[SignPath Foundation](https://signpath.org)** offers free code signing to
-  qualifying open-source projects, which this is. It does not grant instant
-  reputation either, but it costs nothing and names a real publisher. See
-  [CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md), which their terms require
-  a project to publish before applying.
-- **[Azure Artifact Signing](https://azure.microsoft.com/en-us/products/artifact-signing)**
-  at about $9.99/month is the paid option Microsoft now recommends. An OV
-  certificate from a CA runs $150–300/year for the same SmartScreen behaviour.
+  **Unblock** → **OK**.
+
+Code signing does not remove this. EV certificates used to bypass SmartScreen
+on first download, and
+[Microsoft removed that behaviour in 2024](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/code-signing-options).
+Signed files now build reputation the same way unsigned ones do.
 
 ### First run on macOS
 
@@ -161,9 +148,6 @@ chmod +x capture-tool-macos-arm64
 xattr -d com.apple.quarantine capture-tool-macos-arm64
 ```
 
-Signing would remove all of this, at $99/year for an Apple Developer account.
-Worth it only if this gets handed to people who should not have to be told.
-
 ---
 
 ## Walking a rack
@@ -200,19 +184,15 @@ recorded is touched, and the rest of the rack follows on from there.
 Right-clicking a row does the same things, if your hands are already on the
 mouse.
 
-### Duplicates are refused, not listed
+### Duplicates
 
 A MAC already in the rack will not be recorded a second time. You get
-`Already recorded at C1/5`, and the position does **not** advance — the next
-real machine takes it.
+`Already recorded at C1/5`, and the position does not advance — the next real
+machine takes it.
 
-This is deliberate. A duplicate is a double press or a miner heard twice, and
-writing it would consume a position belonging to a real machine, shifting
-everything after it by one.
-
-Antminers send every report **twice, one second apart**, by design. That pair
-is collapsed into one press before any of this applies, so the refusal only
-ever fires on a genuine repeat.
+Antminers send every report twice, one second apart, by design. That pair is
+collapsed into one press before any of this applies, so the refusal only ever
+fires on a genuine repeat.
 
 ### Nothing is lost if the laptop sleeps
 
@@ -280,40 +260,9 @@ A3 and A4 are out of commission. There is no O4 — `34.x` is the testbench, and
 a capture from that range labels itself as such.
 
 The can is derived from the source address of every report: the first octet
-encodes it, `1x` → A, `2x` → B, `3x` → O. A machine answering from `15.4.9.113`
-is in A5. If a report arrives from a different can than the one being walked,
-the app says so rather than recording it quietly.
-
----
-
-## The capture tool
-
-Only needed when a miner type is not recognised yet.
-
-```
-capture-tool                 record miner broadcasts
-capture-tool parse FILE      decode a capture into miner reports
-capture-tool ports           list the UDP ports it listens on
-capture-tool sniff           how to find a port it cannot see
-```
-
-It binds ~77 candidate UDP ports and logs every packet with source, port, hex
-and ASCII, to a file that can be sent on for a parser to be written against.
-Antminer's port 14235 is known; everything else was found this way.
-
-**If a press produces nothing**, the miner is using a port not in the list.
-`capture-tool sniff` prints the exact `tcpdump` line for your machine, which
-sees every port with nothing to install. One run finds it permanently.
-
-### Background noise is normal
-
-Traffic appears the moment it starts, before you touch a miner. The most common
-is a 4-byte `01 00 00 00` on **udp/10001** every ~10 seconds from a pile of
-`.254` addresses — that is Ubiquiti UniFi device discovery, not miners.
-
-Repeated identical payloads collapse to a count automatically, and `-mute 10001`
-silences a port entirely. Neither affects the capture files: everything
-received is always written to disk in full.
+encodes it, `1x` → A, `2x` → B, `3x` → O. A machine answering from
+`15.4.9.113` is in A5. If a report arrives from a different can than the one
+being walked, the app says so rather than recording it quietly.
 
 ---
 
@@ -330,8 +279,8 @@ received is always written to disk in full.
 > right-hand LEDs flash. This is the single most likely reason a Whatsminer
 > appears not to report.
 
-Both vendors are heard by the same listener at the same time, so a mixed can
-is one walk rather than two tools.
+Both vendors are heard by the same listener at the same time, so a mixed can is
+one walk rather than two tools.
 
 Adding a vendor is a new file in `internal/parse`, not a change to anything
 that already works.
@@ -340,19 +289,45 @@ Note that no vendor's report contains a **serial number** — only IP and MAC.
 The serial can only come from the sitemap, which is exactly why position has to
 be recorded during the walk. It cannot be recovered afterwards.
 
+## The capture tool
+
+Only needed when a miner type is not recognised yet.
+
+```
+capture-tool                 record miner broadcasts
+capture-tool parse FILE      decode a capture into miner reports
+capture-tool ports           list the UDP ports it listens on
+capture-tool sniff           how to find a port it cannot see
+```
+
+It binds ~77 candidate UDP ports and logs every packet with source, port, hex
+and ASCII, to a file that can be sent on for a parser to be written against.
+Antminer's port 14235 is known; everything else was found this way.
+
+If a press produces nothing, the miner is using a port not in the list.
+`capture-tool sniff` prints the exact `tcpdump` line for your machine, which
+sees every port with nothing to install. One run finds it permanently.
+
+### Background noise is normal
+
+Traffic appears the moment it starts, before you touch a miner. The most common
+is a 4-byte `01 00 00 00` on **udp/10001** every ~10 seconds from a pile of
+`.254` addresses — that is Ubiquiti UniFi device discovery, not miners.
+
+Repeated identical payloads collapse to a count automatically, and
+`-mute 10001` silences a port entirely. Neither affects the capture files:
+everything received is always written to disk in full.
+
 ---
 
-## Not in this tool, on purpose
+## Not in this tool
 
-- **No network scanning.** BTC Tools already does that well.
-- **No config push, firmware, or pool management.**
-- **No guessing where a gap is.** If a rack comes up short, it gets reported
-  short. Statistical inference from serial prefix and MAC OUI was tested
-  against 212 simulated dropouts: 15% uniquely correct, 61% tied, 24% outright
-  wrong. A confident wrong answer in a site map is worse than a blank.
-- **No sitemap loading or live position validation** in v1. Sitemapping happens
-  in Sheets beforehand and that process works; this tool slots into the
-  existing workflow without changing anyone else's job.
+- No network scanning. BTC Tools already does that well.
+- No config push, firmware, or pool management.
+- No guessing where a gap is. If a rack comes up short, it gets reported short.
+- No sitemap loading or live position validation. Sitemapping happens in Sheets
+  beforehand and that process works; this tool slots into the existing workflow
+  without changing anyone else's job.
 
 ## Update notice
 
@@ -391,13 +366,13 @@ because it embeds the system webview.
 
 ```bash
 go build -o capture-tool ./cmd/capture-tool    # the command-line tool
-cd gui && wails build                        # the app
+cd gui && wails build                          # the app
 ```
 
 Releases are built automatically. Tagging is the only step needed to publish:
 
 ```bash
-git tag v1.2.0 && git push origin v1.2.0
+git tag v2.6.0 && git push origin v2.6.0
 ```
 
 ## License
