@@ -19,19 +19,25 @@ Numbered to match the steps in the main README.
 | `mac-08-confirm.png` | The confirmation, **Open Anyway** again |
 | `mac-09-password.png` | Touch ID / administrator password |
 
-### Windows install (still to capture)
+### Windows install (already captured)
 
-| Filename | What to capture |
+| Filename | What it shows |
 |---|---|
-| `win-01-smartscreen.png` | "Windows protected your PC", **before** clicking More info |
-| `win-02-run-anyway.png` | Same dialog after **More info**, showing **Run anyway** |
-| `win-03-firewall.png` | The firewall prompt, with **Private networks** ticked |
+| `win-01-download.png` | The Releases page, downloading the Windows exe |
+| `win-02-downloaded.png` | The finished download in the browser |
+| `win-03-smartscreen.png` | "Windows protected your PC", **More info** |
+| `win-04-run-anyway.png` | The expanded dialog, **Run anyway** |
+
+The firewall prompt has no screenshot. It appears only on a first run and is
+skipped entirely once a rule exists, so it is awkward to capture — and the
+README explains it in words instead. Worth adding if it ever turns up on a
+clean machine.
 
 ### The app itself (still to capture)
 
 | Filename | What to capture |
 |---|---|
-| `04-app-empty.png` | The app open, before starting |
+| `04-app-empty.png` | The app open, before starting — used as the header image |
 | `05-walking.png` | Mid-walk with a few rows captured |
 | `06-cans.png` | The **Cans…** editor open |
 | `07-export.png` | The Save dialog from **Export CSV** |

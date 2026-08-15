@@ -8,6 +8,8 @@ position with every captured report**, so serial/MAC correlation is a direct
 join instead of an assumption that row *n* of a CSV is grid position *n*. One
 missed machine no longer silently shifts every pairing after it.
 
+![OpenIPReporter](docs/images/04-app-empty.png)
+
 ---
 
 ## Which file do I download?
@@ -34,23 +36,33 @@ in before suspecting the software.**
 
 ### First run on Windows
 
-Two prompts, both expected. Screenshots of each are in
-[`docs/images`](docs/images) once uploaded:
+Two clicks past a warning, and it runs. Nothing to install.
 
-<!-- These render as soon as the files are pushed; until then GitHub shows a
-     broken-image icon, which is why they are grouped rather than inline. -->
-| SmartScreen | After "More info" | Firewall |
-|---|---|---|
-| ![SmartScreen warning](docs/images/win-01-smartscreen.png) | ![Run anyway](docs/images/win-02-run-anyway.png) | ![Firewall prompt](docs/images/win-03-firewall.png) |
+**1. Download `OpenIPReporter-windows-x64.exe`** from the Releases page.
 
+![Downloading the release](docs/images/win-01-download.png)
 
-1. **"Windows protected your PC"** (SmartScreen). Click **More info**, then
-   **Run anyway**. See [Why the warning appears](#why-the-warning-appears) —
-   it is not a virus detection, and there is a way to stop seeing it.
+**2. Open it** from your browser's downloads.
 
-2. **Windows Defender Firewall** asks whether to allow it. **Click Allow, and
-   make sure "Private networks" is ticked.** Miss this and the app runs but
-   hears nothing. An administrator has to click it.
+![The finished download](docs/images/win-02-downloaded.png)
+
+**3. "Windows protected your PC" appears.** Click **More info**.
+
+This is SmartScreen saying the file has no reputation yet, not a virus
+detection — see [Why the warning appears](#why-the-warning-appears).
+
+![SmartScreen warning](docs/images/win-03-smartscreen.png)
+
+**4. Click Run anyway.**
+
+![Run anyway](docs/images/win-04-run-anyway.png)
+
+**5. Allow it through the firewall**, making sure **Private networks** is
+ticked. Miss this and the app runs but hears nothing at all, which looks
+exactly like a broken app. An administrator has to click it.
+
+This prompt only appears the first time, and not at all if a rule for the app
+already exists — which is why there is no screenshot of it here.
 
 ### Why the warning appears
 
@@ -233,6 +245,8 @@ downstream for a field usually left blank.
 
 A rack walked halfway exports halfway. It is not padded out to a full rack,
 because that would make an unfinished walk look finished.
+
+![Exporting](docs/images/07-export.png)
 
 ---
 
