@@ -352,8 +352,17 @@ v2.5.0 · offline           no route to the internet, which is normal in a can
 v2.5.0 · v2.6.0 available  click it to see the release notes again
 ```
 
-If a newer version exists you get its release notes. It never downloads or
-installs anything — the button opens the download page in your browser.
+If a newer version exists you get its release notes and an **Update now**
+button. That downloads the new version, checks it against the SHA-256 published
+with the release, replaces this copy and restarts. Nothing downloads unless you
+press it.
+
+An update installed this way arrives over HTTP rather than through a browser,
+so it carries neither Windows' Mark of the Web nor macOS' quarantine flag — the
+new copy starts without the warning the first download had to be clicked past.
+
+If anything fails, the running copy is left untouched and the reason is shown.
+**Release page** opens the download in a browser instead.
 
 Turn it off with the checkbox on that notice. Off, the app makes no outbound
 network requests at all. It also stays quiet when there is no route to the

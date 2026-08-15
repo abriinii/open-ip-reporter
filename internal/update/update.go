@@ -27,10 +27,28 @@ const timeout = 4 * time.Second
 // Release is the latest published version, whether or not it is newer than the
 // one running.
 type Release struct {
-	Version string `json:"version"` // e.g. "v2.3.0"
-	Notes   string `json:"notes"`   // the release body, as written on the tag
-	URL     string `json:"url"`     // where a human goes to get it
-	Newer   bool   `json:"newer"`   // true when it is ahead of the running build
+	Version string  `json:"version"` // e.g. "v2.3.0"
+	Notes   string  `json:"notes"`   // the release body, as written on the tag
+	URL     string  `json:"url"`     // where a human goes to get it
+	Newer   bool    `json:"newer"`   // true when it is ahead of the running build
+	Assets  []Asset `json:"assets"`  // the published files
+}
+
+// Asset is one file attached to a release.
+type Asset struct {
+	Name string `json:"name"`
+	URL  string `json:"url"`
+	Size int64  `json:"size"`
+}
+
+// Find returns the asset with this name.
+func (r *Release) Find(name string) (Asset, bool) {
+	for _, a := range r.Assets {
+		if a.Name == name {
+			return a, true
+		}
+	}
+	return Asset{}, false
 }
 
 // Checker looks up the latest release. The API base is a field so tests can
@@ -39,6 +57,11 @@ type Checker struct {
 	Repo    string // "owner/name"
 	BaseURL string // defaults to GitHub's API
 	Client  *http.Client
+
+	// DownloadClient fetches release files. Separate from Client because the
+	// version check gives up after four seconds, which is far too short for an
+	// eleven megabyte download.
+	DownloadClient *http.Client
 }
 
 // NewChecker returns a checker for a repository.
@@ -93,6 +116,11 @@ func (c *Checker) Check(ctx context.Context, current string) (*Release, error) {
 		HTMLURL    string `json:"html_url"`
 		Draft      bool   `json:"draft"`
 		Prerelease bool   `json:"prerelease"`
+		Assets     []struct {
+			Name string `json:"name"`
+			URL  string `json:"browser_download_url"`
+			Size int64  `json:"size"`
+		} `json:"assets"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
 		return nil, err
@@ -101,12 +129,16 @@ func (c *Checker) Check(ctx context.Context, current string) (*Release, error) {
 		return nil, nil
 	}
 
-	return &Release{
+	rel := &Release{
 		Version: body.TagName,
 		Notes:   strings.TrimSpace(body.Body),
 		URL:     body.HTMLURL,
 		Newer:   Newer(body.TagName, current),
-	}, nil
+	}
+	for _, a := range body.Assets {
+		rel.Assets = append(rel.Assets, Asset{Name: a.Name, URL: a.URL, Size: a.Size})
+	}
+	return rel, nil
 }
 
 // Newer reports whether version a is later than version b. Both are compared

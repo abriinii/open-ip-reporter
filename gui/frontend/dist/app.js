@@ -427,8 +427,11 @@ const TOAST_MIN_MS = 1100;
 let checkStarted = 0;
 let updateState = { state: "" };
 
+// State carries both the running version and the newest published one. The
+// update dialog must always take the latter: reading state.version here put
+// the running version in a heading that said it was available.
 function latestFromState() {
-  return { version: state?.latestVersion, notes: state?.latestNotes, url: "" };
+  return { version: state?.latestVersion, notes: state?.latestNotes };
 }
 
 function setVersionLine() {
@@ -449,7 +452,7 @@ function setVersionLine() {
       break;
     }
     case "available":
-      el.innerHTML = `${esc(v)} · <span class="stale" id="version-update">${esc(updateState.version || state?.latestVersion || "update")} available</span>`;
+      el.innerHTML = `${esc(v)} · <span class="stale" id="version-update">${esc(state?.latestVersion || "update")} available</span>`;
       $("version-update").onclick = () => showUpdate(latestFromState());
       break;
     case "unreachable":
@@ -512,9 +515,13 @@ function onUpdateStatus(s) {
       afterMinimum(() => {
         $("toast").classList.add("hidden");
         setVersionLine();
-        showUpdate(s.version ? s : latestFromState());
+        showUpdate(latestFromState());
       });
       break;
+
+    case "downloading": setUpdateBusy("Downloading…"); break;
+    case "installing":  setUpdateBusy("Installing…"); break;
+    case "restarting":  setUpdateBusy("Restarting…"); break;
 
     default: // "off" or "dev": nothing was checked, so show nothing
       $("toast").classList.add("hidden");
@@ -535,20 +542,25 @@ function showNotes() {
   $("up-notes").textContent = state?.latestNotes || "No release notes were published for this version.";
   $("up-never").parentElement.classList.add("hidden");
   $("up-open").classList.add("hidden");
+  $("up-page").classList.add("hidden");
   $("up-later").textContent = "Close";
   $("updatedlg").classList.remove("hidden");
   prompting = true;
 }
 
 function showUpdate(rel) {
-  if (!rel || !rel.version) return;
+  rel = rel || latestFromState();
+  if (!rel.version) return;
   $("up-title").textContent = `Version ${rel.version} is available`;
   $("up-never").parentElement.classList.remove("hidden");
   $("up-open").classList.remove("hidden");
+  $("up-page").classList.remove("hidden");
+  setUpdateBusy(null);
   $("up-later").textContent = "Later";
   $("up-current").textContent =
-    `You are running ${state?.version || "an older version"}. Nothing is downloaded or ` +
-    `installed by this app — the button opens the release page in your browser.`;
+    `You are running ${state?.version || "an older version"}. ` +
+    `Update now downloads it, checks it against its published checksum, ` +
+    `replaces this copy and restarts.`;
   $("up-notes").textContent = rel.notes || "No release notes were published for this version.";
   $("up-never").checked = false;
   $("updatedlg").classList.remove("hidden");
@@ -562,7 +574,27 @@ function closeUpdate() {
 }
 
 $("up-later").onclick = closeUpdate;
-$("up-open").onclick = async () => { await call("OpenReleasePage"); closeUpdate(); };
+$("up-page").onclick = () => call("OpenReleasePage");
+$("up-open").onclick = async () => {
+  // The dialog stays open and reports progress. Closing it would leave the
+  // program replacing itself with nothing on screen saying so.
+  setUpdateBusy("Downloading…");
+  const s = await call("InstallUpdate");
+  if (s && s.updateError) {
+    setUpdateBusy(null);
+    $("up-notes").textContent = "Update failed: " + s.updateError +
+      "\n\nThe running copy has not been touched. Use the release page instead.";
+  }
+};
+
+function setUpdateBusy(label) {
+  const busy = label !== null;
+  $("up-open").disabled = busy;
+  $("up-page").disabled = busy;
+  $("up-later").disabled = busy;
+  $("up-never").disabled = busy;
+  $("up-open").textContent = busy ? label : "Update now";
+}
 document.addEventListener("keydown", (ev) => {
   if (ev.key === "Escape" && !$("updatedlg").classList.contains("hidden")) closeUpdate();
 });

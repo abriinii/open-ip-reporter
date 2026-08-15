@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	goruntime "runtime"
 	"sync"
 	"time"
 
@@ -60,6 +62,7 @@ type App struct {
 	updateRepo   string
 	latest       *update.Release
 	updateState  string
+	updateError  string
 	layout       site.Site
 }
 
@@ -84,6 +87,7 @@ func NewApp() *App {
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	a.loadLayout()
+	update.CleanUp() // remove the copy the last update moved aside
 	// Kicked from Go rather than waiting for the window to ask. The result is
 	// kept in State, so it is picked up on an ordinary render even if the
 	// event never arrives.
@@ -373,8 +377,78 @@ func (a *App) checkForUpdate() {
 	}
 }
 
+// InstallUpdate downloads the new version, verifies it, replaces this copy
+// and restarts.
+//
+// Only ever runs because someone pressed the button. Nothing downloads on its
+// own — a tool that replaces itself unasked on a machine walking a live site
+// is not a tool anyone should have to trust.
+func (a *App) InstallUpdate() State {
+	a.mu.Lock()
+	rel := a.latest
+	a.mu.Unlock()
+
+	if rel == nil || !rel.Newer {
+		return a.State()
+	}
+
+	asset := update.AssetFor(goruntime.GOOS)
+	if asset == "" {
+		return a.setUpdateState("failed", "no download is published for this platform")
+	}
+
+	a.setUpdateState("downloading", "")
+
+	dir, err := os.MkdirTemp("", "openipreporter-*")
+	if err != nil {
+		return a.setUpdateState("failed", err.Error())
+	}
+	defer os.RemoveAll(dir)
+
+	archive, err := newChecker(a.updateRepo).Download(context.Background(), rel, asset, dir)
+	if err != nil {
+		return a.setUpdateState("failed", err.Error())
+	}
+
+	a.setUpdateState("installing", "")
+
+	target, err := update.Install(archive)
+	if err != nil {
+		return a.setUpdateState("failed", err.Error())
+	}
+
+	a.setUpdateState("restarting", "")
+	a.relaunch(target)
+	return a.State()
+}
+
+// relaunch starts the replacement and quits, after giving the window a moment
+// to show that it is restarting rather than appearing to vanish.
+func (a *App) relaunch(target string) {
+	go func() {
+		time.Sleep(700 * time.Millisecond)
+		a.stopListening() // release the miner ports before the new copy wants them
+
+		switch goruntime.GOOS {
+		case "darwin":
+			exec.Command("open", "-n", target).Start()
+		default:
+			exec.Command(target).Start()
+		}
+		os.Exit(0)
+	}()
+}
+
+func (a *App) setUpdateState(state, msg string) State {
+	a.mu.Lock()
+	a.updateState = state
+	a.updateError = msg
+	a.mu.Unlock()
+	a.emit("update-status", state)
+	return a.State()
+}
+
 // OpenReleasePage sends the operator to the download page in their browser.
-// Nothing is downloaded or installed by this program.
 func (a *App) OpenReleasePage() {
 	a.mu.Lock()
 	rel := a.latest
@@ -628,6 +702,7 @@ type State struct {
 	UpdateState   string `json:"updateState"`
 	LatestVersion string `json:"latestVersion"`
 	LatestNotes   string `json:"latestNotes"`
+	UpdateError   string `json:"updateError"`
 	Copied        string `json:"copied"` // what just went on the clipboard, for confirmation
 	Full          bool   `json:"full"`
 	CanUndo       bool   `json:"canUndo"`
@@ -644,6 +719,7 @@ func (a *App) stateLocked(errMsg string) State {
 		Exported:    a.exported,
 		Version:     a.version,
 		UpdateState: a.updateState,
+		UpdateError: a.updateError,
 		Error:       errMsg,
 	}
 	// Before the early return on purpose: at launch there is no rack loaded,
