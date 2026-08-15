@@ -732,6 +732,10 @@ type State struct {
 
 func (a *App) stateLocked(errMsg string) State {
 	st := State{
+		// Always a slice, never nil. A nil slice marshals as null, and the
+		// window read .length off it: on a fresh launch, before any rack is
+		// loaded, that threw and killed the rest of the startup with it.
+		Entries:     []Row{},
 		Listening:   a.listening,
 		BoundPorts:  a.boundPorts,
 		Exported:    a.exported,

@@ -46,6 +46,7 @@ export namespace main {
 	    updateState: string;
 	    latestVersion: string;
 	    latestNotes: string;
+	    updateError: string;
 	    copied: string;
 	    full: boolean;
 	    canUndo: boolean;
@@ -77,6 +78,7 @@ export namespace main {
 	        this.updateState = source["updateState"];
 	        this.latestVersion = source["latestVersion"];
 	        this.latestNotes = source["latestNotes"];
+	        this.updateError = source["updateError"];
 	        this.copied = source["copied"];
 	        this.full = source["full"];
 	        this.canUndo = source["canUndo"];

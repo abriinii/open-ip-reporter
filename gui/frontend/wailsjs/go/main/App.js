@@ -18,20 +18,44 @@ export function CopyMAC(arg1) {
   return window['go']['main']['App']['CopyMAC'](arg1);
 }
 
+export function DataFolder() {
+  return window['go']['main']['App']['DataFolder']();
+}
+
 export function Delete(arg1) {
   return window['go']['main']['App']['Delete'](arg1);
+}
+
+export function ExampleLayout() {
+  return window['go']['main']['App']['ExampleLayout']();
 }
 
 export function Export() {
   return window['go']['main']['App']['Export']();
 }
 
+export function ImportLayout() {
+  return window['go']['main']['App']['ImportLayout']();
+}
+
 export function InsertBlankAbove(arg1) {
   return window['go']['main']['App']['InsertBlankAbove'](arg1);
 }
 
+export function InstallUpdate() {
+  return window['go']['main']['App']['InstallUpdate']();
+}
+
+export function JSError(arg1) {
+  return window['go']['main']['App']['JSError'](arg1);
+}
+
 export function Layout() {
   return window['go']['main']['App']['Layout']();
+}
+
+export function OpenDataFolder() {
+  return window['go']['main']['App']['OpenDataFolder']();
 }
 
 export function OpenReleasePage() {

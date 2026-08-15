@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -617,5 +618,33 @@ func TestCheckForUpdateReturnsTheFinishedResult(t *testing.T) {
 	}
 	if st.LatestNotes != "Notes." {
 		t.Errorf("LatestNotes = %q on return", st.LatestNotes)
+	}
+}
+
+// Entries must marshal as an empty list, never null. It used to return early
+// for "no rack loaded" before initialising the slice, and the window read
+// .length off the resulting null: on a fresh launch that threw and took the
+// rest of startup with it, including the update check.
+func TestStateEntriesIsNeverNull(t *testing.T) {
+	a := newTestApp(t)
+
+	for _, when := range []string{"no session", "after a session"} {
+		if when == "after a session" {
+			a.StartSession("B1", 1)
+		}
+		raw, err := json.Marshal(a.State())
+		if err != nil {
+			t.Fatal(err)
+		}
+		var decoded map[string]any
+		if err := json.Unmarshal(raw, &decoded); err != nil {
+			t.Fatal(err)
+		}
+		if decoded["entries"] == nil {
+			t.Errorf("%s: entries marshalled as null, which throws in the window", when)
+		}
+		if _, ok := decoded["entries"].([]any); !ok {
+			t.Errorf("%s: entries is %T, want a list", when, decoded["entries"])
+		}
 	}
 }

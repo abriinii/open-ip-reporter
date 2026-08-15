@@ -52,12 +52,12 @@ function render(s) {
   $("undo").disabled = !s.canUndo;
   $("redo").disabled = !s.canRedo;
   // Exporting is what you do when the walking is done, so it unlocks on Stop.
-  $("export").disabled = s.active || !s.hasSession || s.entries.length === 0;
+  $("export").disabled = s.active || !s.hasSession || (s.entries || []).length === 0;
   $("export").title = s.active ? "Press Stop to export" : "Export this rack as CSV";
 
   $("status-text").textContent =
     `${s.recorded} Device${s.recorded === 1 ? "" : "s"} Connected` +
-    (s.hasSession ? `  ·  ${s.can} rack ${s.rack}  ·  ${s.entries.length} of ${s.positions} positions` : "") +
+    (s.hasSession ? `  ·  ${s.can} rack ${s.rack}  ·  ${(s.entries || []).length} of ${s.positions} positions` : "") +
     (s.hasSession && !s.active ? "  ·  stopped" : "");
 
   if (s.error) hint(s.error, true);
@@ -72,16 +72,19 @@ function render(s) {
 
 function renderRows(s) {
   const body = $("rows");
-  const grew = s.entries.length > lastCount;
-  lastCount = s.entries.length;
+  // Belt and braces: Go now always sends a slice, but a null here used to
+  // throw and take the whole of startup down with it.
+  const entries = s.entries || [];
+  const grew = entries.length > lastCount;
+  lastCount = entries.length;
 
-  $("empty").style.display = s.entries.length > 0 ? "none" : "";
+  $("empty").style.display = entries.length > 0 ? "none" : "";
   body.innerHTML = "";
 
-  s.entries.forEach((e, i) => {
+  entries.forEach((e, i) => {
     const tr = document.createElement("tr");
     tr.className = (i === selected ? "sel " : "") +
-                   (grew && i === s.entries.length - 1 ? "fresh" : "");
+                   (grew && i === entries.length - 1 ? "fresh" : "");
     tr.onclick = () => { selected = i; renderRows(state); };
     tr.oncontextmenu = (ev) => {
       ev.preventDefault();

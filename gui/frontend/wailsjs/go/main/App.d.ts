@@ -5,19 +5,31 @@ import {site} from '../models';
 
 export function Cans():Promise<Array<string>>;
 
-export function CheckForUpdate():Promise<void>;
+export function CheckForUpdate():Promise<main.State>;
 
 export function CopyIP(arg1:number):Promise<main.State>;
 
 export function CopyMAC(arg1:number):Promise<main.State>;
 
+export function DataFolder():Promise<string>;
+
 export function Delete(arg1:number):Promise<main.State>;
+
+export function ExampleLayout():Promise<Array<site.Can>>;
 
 export function Export():Promise<main.State>;
 
+export function ImportLayout():Promise<main.State>;
+
 export function InsertBlankAbove(arg1:number):Promise<main.State>;
 
+export function InstallUpdate():Promise<main.State>;
+
+export function JSError(arg1:string):Promise<void>;
+
 export function Layout():Promise<Array<site.Can>>;
+
+export function OpenDataFolder():Promise<void>;
 
 export function OpenReleasePage():Promise<void>;
 
