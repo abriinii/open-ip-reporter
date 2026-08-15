@@ -5,15 +5,19 @@ them, so they appear as soon as they are pushed — nothing else needs editing.
 
 ### macOS install (already captured)
 
+Numbered to match the steps in the main README.
+
 | Filename | What it shows |
 |---|---|
 | `mac-01-download.png` | The Releases page, downloading the macOS zip |
 | `mac-02-applications.png` | Dragging `OpenIPReporter.app` into Applications |
-| `mac-03-blocked.png` | "Not Opened — Apple could not verify", with **Done** |
-| `mac-04-help.png` | Apple's help page and its link to Privacy & Security |
-| `mac-05-open-anyway.png` | System Settings → Security → **Open Anyway** |
-| `mac-06-confirm.png` | The confirmation dialog with **Open Anyway** |
-| `mac-07-password.png` | The Touch ID / administrator password prompt |
+| `mac-03-open.png` | Opening the app |
+| `mac-04-blocked.png` | The blocked dialog, with the **?** at its top right |
+| `mac-05-done.png` | Clicking **Done** on that dialog |
+| `mac-06-help.png` | Apple's help page and its Privacy & Security link |
+| `mac-07-open-anyway.png` | System Settings → Security → **Open Anyway** |
+| `mac-08-confirm.png` | The confirmation, **Open Anyway** again |
+| `mac-09-password.png` | Touch ID / administrator password |
 
 ### Windows install (still to capture)
 

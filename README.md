@@ -103,33 +103,41 @@ Then open it normally. Otherwise:
 
 ![Downloading the release](docs/images/mac-01-download.png)
 
-**2. Unzip it and drag `OpenIPReporter.app` into Applications.**
+**2. Unzip it and drag `OpenIPReporter.app` into your Applications folder.**
 
 ![Dragging to Applications](docs/images/mac-02-applications.png)
 
-**3. Open it.** macOS refuses the first time. This is the unsigned-app warning,
-not a malware detection — see [Why the warning appears](#why-the-warning-appears).
-Click **Done**, *not* Move to Trash.
+**3. Open the app.**
 
-![Blocked on first launch](docs/images/mac-03-blocked.png)
+![Opening the app](docs/images/mac-03-open.png)
 
-**4. Open Privacy & Security settings.** The quickest route is the **?** button
-on that dialog, which opens Apple's help page with a link straight to the right
-settings pane. Or go to  → System Settings → Privacy & Security yourself.
+**4. It gets blocked.** Click the **?** at the top right of that box. This opens
+Apple's "Apple can't check app for malicious software" page.
 
-![Apple's help page](docs/images/mac-04-help.png)
+Do this *before* dismissing the dialog — clicking Done first takes the **?**
+away with it.
 
-**5. Scroll to Security.** There is a line saying OpenIPReporter was blocked,
-with an **Open Anyway** button.
+![Blocked, with the question mark](docs/images/mac-04-blocked.png)
 
-![Open Anyway in settings](docs/images/mac-05-open-anyway.png)
+**5. Click Done** on the small window. Not Move to Trash.
 
-**6. Confirm with Open Anyway**, then authenticate with Touch ID or an
-administrator password.
+![Clicking Done](docs/images/mac-05-done.png)
 
-| Confirm | Authenticate |
+**6. On the help page, click "Open Privacy & Security settings for me"**, which
+takes you straight to the right pane.
+
+![The help page link](docs/images/mac-06-help.png)
+
+**7. Scroll to the bottom and click Open Anyway**, then click it again on the
+prompt that follows.
+
+| In Settings | The confirmation |
 |---|---|
-| ![Confirm dialog](docs/images/mac-06-confirm.png) | ![Password prompt](docs/images/mac-07-password.png) |
+| ![Open Anyway in settings](docs/images/mac-07-open-anyway.png) | ![Confirming](docs/images/mac-08-confirm.png) |
+
+**8. Authenticate** with your fingerprint or password.
+
+![Authenticating](docs/images/mac-09-password.png)
 
 From then on it opens by double-clicking like anything else.
 
