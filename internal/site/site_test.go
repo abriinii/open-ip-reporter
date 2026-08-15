@@ -7,20 +7,20 @@ import (
 	"testing"
 )
 
-func TestDefaultIsThisSite(t *testing.T) {
-	s := Default()
+func TestExampleListIsUsable(t *testing.T) {
+	s := Example()
 	if err := s.Validate(); err != nil {
-		t.Fatalf("the shipped default does not validate: %v", err)
+		t.Fatalf("the example list does not validate: %v", err)
 	}
 	for _, name := range []string{"A1", "B4", "O3"} {
 		if !s.Has(name) {
-			t.Errorf("default site is missing %s", name)
+			t.Errorf("example list is missing %s", name)
 		}
 	}
 	// A3 and A4 are out of commission, and 34.x is the testbench, not O4.
 	for _, name := range []string{"A3", "A4", "O4"} {
 		if s.Has(name) {
-			t.Errorf("default site offers %s, which is not walkable", name)
+			t.Errorf("example list offers %s, which is not walkable", name)
 		}
 	}
 	if g, _ := s.Geometry("B1"); g.Positions() != 50 {
@@ -51,7 +51,7 @@ func TestADifferentSiteWorks(t *testing.T) {
 }
 
 func TestGeometryLookupIsCaseInsensitive(t *testing.T) {
-	s := Default()
+	s := Example()
 	if _, ok := s.Geometry("b1"); !ok {
 		t.Error("lowercase can name not found")
 	}
@@ -59,7 +59,6 @@ func TestGeometryLookupIsCaseInsensitive(t *testing.T) {
 
 func TestValidateRejectsWhatAPersonWouldTypoWrong(t *testing.T) {
 	cases := map[string]Site{
-		"empty list":     {},
 		"no name":        {Cans: []Can{{Name: "  ", Rows: 10, Columns: 5}}},
 		"zero rows":      {Cans: []Can{{Name: "A1", Rows: 0, Columns: 5}}},
 		"negative cols":  {Cans: []Can{{Name: "A1", Rows: 10, Columns: -2}}},
@@ -113,17 +112,14 @@ func TestNormaliseTidiesHandEditedInput(t *testing.T) {
 
 // A fresh install has no file. That is not an error: it seeds the defaults and
 // writes them out so there is something to edit.
-func TestLoadSeedsDefaultsOnFirstRun(t *testing.T) {
+func TestFreshInstallHasNoCans(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "cans.json")
 	s, err := Load(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(s.Cans) != len(Default().Cans) {
-		t.Errorf("seeded %d cans, want the defaults", len(s.Cans))
-	}
-	if _, err := os.Stat(path); err != nil {
-		t.Errorf("first run did not write a file to edit: %v", err)
+	if len(s.Cans) != 0 {
+		t.Errorf("a fresh install started with %d cans, want none", len(s.Cans))
 	}
 }
 
@@ -166,8 +162,9 @@ func TestLoadRefusesGarbageRatherThanResetting(t *testing.T) {
 func TestSaveRefusesToWriteAnInvalidLayout(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "cans.json")
-	if err := (Site{}).Save(path); err == nil {
-		t.Fatal("saved an empty layout")
+	bad := Site{Cans: []Can{{Name: "Broken", Rows: 0, Columns: 5}}}
+	if err := bad.Save(path); err == nil {
+		t.Fatal("saved a can with no rows")
 	}
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Error("an invalid layout still created a file")

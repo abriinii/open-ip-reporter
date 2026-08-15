@@ -62,7 +62,7 @@ function render(s) {
 
   if (s.error) hint(s.error, true);
   else if (s.copied) hint(`copied ${s.copied}`);
-  else if (!s.listening) hint("not listening — no ports could be opened", true);
+  else if (!s.listening) hint("not listening: no ports could be opened", true);
   else if (s.exported) hint(`exported ${s.exported}`);
 
   applyUpdateState(s.updateState, s);
@@ -286,42 +286,79 @@ async function deleteRow() {
 }
 
 async function editMAC(i) {
-  prompting = true;
-  try {
-    const cur = state.entries[i]?.mac ?? "";
-    const val = window.prompt("MAC address for this position (empty = skipped):", cur);
-    if (val === null) return;
-    render(await call("SetMAC", i, val.trim()));
-  } finally { prompting = false; }
+  const val = await ask({
+    title: "MAC address",
+    hint: "Leave it empty to make this a skipped position.",
+    value: state.entries[i]?.mac ?? "",
+    placeholder: "aa:bb:cc:dd:ee:ff",
+  });
+  if (val === null) return;
+  render(await call("SetMAC", i, val.trim()));
+}
+
+// ask replaces window.prompt, which WKWebView does not implement, so on macOS
+// every prompt returned nothing and the menu item appeared to do nothing at
+// all. WebView2 does implement it, but frames it as "wails.localhost says".
+//
+// Resolves to the typed string, or null if cancelled.
+function ask({ title, hint, value, placeholder }) {
+  return new Promise((resolve) => {
+    const input = $("ask-input");
+    $("ask-title").textContent = title;
+    $("ask-hint").textContent = hint || "";
+    $("ask-error").textContent = "";
+    input.value = value || "";
+    input.placeholder = placeholder || "";
+
+    $("askdlg").classList.remove("hidden");
+    prompting = true;
+    input.focus();
+    input.select();
+
+    const done = (result) => {
+      $("askdlg").classList.add("hidden");
+      prompting = false;
+      input.onkeydown = null;
+      $("ask-ok").onclick = null;
+      $("ask-cancel").onclick = null;
+      resolve(result);
+    };
+
+    $("ask-ok").onclick = () => done(input.value);
+    $("ask-cancel").onclick = () => done(null);
+    input.onkeydown = (ev) => {
+      if (ev.key === "Enter") { ev.preventDefault(); done(input.value); }
+      if (ev.key === "Escape") { ev.preventDefault(); done(null); }
+    };
+  });
 }
 
 async function editNote(i) {
-  prompting = true;
-  try {
-    const cur = state.entries[i]?.note ?? "";
-    const val = window.prompt(
-      "Note for this position — why it was skipped, or anything worth\n" +
-      "finding again later. It is saved with the exported CSV.", cur);
-    if (val === null) return;
-    render(await call("SetNote", i, val));
-  } finally { prompting = false; }
+  const val = await ask({
+    title: "Note",
+    hint: "Saved with the exported CSV.",
+    value: state.entries[i]?.note ?? "",
+    placeholder: "wont ip report",
+  });
+  if (val === null) return;
+  render(await call("SetNote", i, val));
 }
 
 // Repositioning one recorded row, as opposed to moving the walk. Everything
 // below it renumbers to follow.
 async function editRowPosition(i) {
-  prompting = true;
-  try {
-    const e = state.entries[i];
-    const val = window.prompt(
-      `Position for row ${i + 1}, as row/column. Rows below renumber to follow.\n` +
-      `This rack is ${state.rows} rows by ${state.columns} columns.`,
-      `${e.row}/${e.column}`);
-    if (val === null) return;
-    const m = val.match(/^\s*(\d+)\s*[\/,\s]\s*(\d+)\s*$/);
-    if (!m) { hint(`"${val}" is not a row/column, e.g. 7/2`, true); return; }
-    render(await call("SetPosition", i, parseInt(m[2], 10), parseInt(m[1], 10)));
-  } finally { prompting = false; }
+  const e = state.entries[i];
+  const val = await ask({
+    title: "Position",
+    hint: `Row and column, like 7/2. Rows below renumber to follow.`,
+    value: `${e.row}/${e.column}`,
+    placeholder: "7/2",
+  });
+  if (val === null) return;
+
+  const m = val.match(/^\s*(\d+)\s*[\/,\s]\s*(\d+)\s*$/);
+  if (!m) { hint(`"${val}" is not a row and column, like 7/2`, true); return; }
+  render(await call("SetPosition", i, parseInt(m[2], 10), parseInt(m[1], 10)));
 }
 
 // ---------- can editor ----------
@@ -334,49 +371,77 @@ let draft = [];
 function renderCans() {
   const body = $("cansrows");
   body.innerHTML = "";
+  $("cans-empty").classList.toggle("hidden", draft.length > 0);
+
   draft.forEach((c, i) => {
     const tr = document.createElement("tr");
-    const positions = (c.rows > 0 && c.columns > 0) ? c.rows * c.columns : "";
     tr.innerHTML =
-      `<td><input data-i="${i}" data-f="name" value="${esc(c.name)}" placeholder="e.g. B1"></td>` +
-      `<td><input data-i="${i}" data-f="rows" class="num" type="number" min="1" value="${c.rows || ""}"></td>` +
-      `<td><input data-i="${i}" data-f="columns" class="num" type="number" min="1" value="${c.columns || ""}"></td>` +
-      `<td class="pos">${positions}</td>` +
+      `<td><div class="can-cell">` +
+        `<input data-i="${i}" value="${esc(c.name)}" placeholder="e.g. B1">` +
+        `<button class="size" data-size="${i}" title="Rack size">${c.rows || 0}&#215;${c.columns || 0}</button>` +
+      `</div></td>` +
       `<td class="del"><button class="rm" data-rm="${i}" title="Remove">&times;</button></td>`;
     body.appendChild(tr);
   });
 }
 
 $("cansrows").addEventListener("input", (ev) => {
-  const el = ev.target;
-  const i = el.dataset.i;
-  if (i === undefined) return;
-  const f = el.dataset.f;
-  draft[i][f] = f === "name" ? el.value : parseInt(el.value, 10) || 0;
-  // Only the positions column needs recomputing; redrawing the whole table
-  // would take the caret out of the box being typed in.
-  const cell = el.closest("tr").querySelector("td.pos");
-  const c = draft[i];
-  cell.textContent = (c.rows > 0 && c.columns > 0) ? c.rows * c.columns : "";
+  const i = ev.target.dataset.i;
+  if (i !== undefined) draft[i].name = ev.target.value;
 });
 
 $("cansrows").addEventListener("click", (ev) => {
-  const i = ev.target.dataset?.rm;
-  if (i === undefined) return;
-  draft.splice(i, 1);
-  renderCans();
+  const btn = ev.target.closest("button");
+  if (!btn) return;
+  if (btn.dataset.rm !== undefined) { draft.splice(Number(btn.dataset.rm), 1); renderCans(); }
+  if (btn.dataset.size !== undefined) editCanSize(Number(btn.dataset.size));
 });
+
+// Rack size sits behind the name rather than in its own columns of spinners.
+// It is set once per can and then never looked at again, so it does not earn
+// a column beside the thing that is actually read.
+async function editCanSize(i) {
+  const c = draft[i];
+  const val = await ask({
+    title: c.name ? `Rack size for ${c.name}` : "Rack size",
+    hint: "Rows and columns in one rack, like 10x5.",
+    value: `${c.rows || 10}x${c.columns || 5}`,
+    placeholder: "10x5",
+  });
+  if (val === null) return;
+
+  const m = val.match(/^\s*(\d+)\s*[x×,\s]\s*(\d+)\s*$/i);
+  if (!m) { $("cans-error").textContent = `"${val}" is not rows and columns, like 10x5`; return; }
+  draft[i].rows = parseInt(m[1], 10);
+  draft[i].columns = parseInt(m[2], 10);
+  $("cans-error").textContent = "";
+  renderCans();
+}
 
 $("addcan").onclick = () => {
   draft.push({ name: "", rows: 10, columns: 5 });
   renderCans();
-  const inputs = $("cansrows").querySelectorAll('input[data-f="name"]');
+  const inputs = $("cansrows").querySelectorAll("input");
   inputs[inputs.length - 1]?.focus();
+};
+
+$("importcans").onclick = async () => {
+  const st = await call("ImportLayout");
+  if (!st) return;
+  if (st.error) { $("cans-error").textContent = st.error; return; }
+  draft = ((await call("Layout")) || []).map((c) => ({ ...c }));
+  $("cans-error").textContent = "";
+  renderCans();
+  await refreshCans();
+};
+
+$("examplecans").onclick = async () => {
+  draft = ((await call("ExampleLayout")) || []).map((c) => ({ ...c }));
+  renderCans();
 };
 
 async function openCans() {
   draft = ((await call("Layout")) || []).map((c) => ({ ...c }));
-  if (draft.length === 0) draft.push({ name: "", rows: 10, columns: 5 });
   $("cans-error").textContent = "";
   renderCans();
   $("cansdlg").classList.remove("hidden");
@@ -508,7 +573,7 @@ function onUpdateStatus(s) {
     case "unreachable":
       // Standing in a can there is no route to the internet. Say so plainly
       // rather than implying something is broken.
-      afterMinimum(() => { toast("No connection — could not check", "warn", 2600); setVersionLine(); });
+      afterMinimum(() => { toast("No connection, could not check", "warn", 2600); setVersionLine(); });
       break;
 
     case "available":

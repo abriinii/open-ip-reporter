@@ -286,7 +286,10 @@ td.note { color: var(--text-2); white-space: nowrap; overflow: hidden; text-over
   color: var(--text-3); cursor: pointer; font-size: 15px;
 }
 .rm:hover { color: var(--bad); border-color: var(--line); }
-.addcan { margin-top: 12px; border-color: var(--line); }
+.cans-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.cans-actions .tool { border-color: var(--line); }
+.cans-empty { padding: 22px 4px; color: var(--text-3); font-size: 13px; text-align: center; }
+.cans-empty.hidden { display: none; }
 
 .dlg-foot {
   display: flex; align-items: center; gap: 10px;
@@ -367,3 +370,27 @@ td.note { color: var(--text-2); white-space: nowrap; overflow: hidden; text-over
 .never.hidden, .primary-sm.hidden { display: none !important; }
 
 .dlg-head a { color: var(--accent); text-decoration: underline; cursor: pointer; }
+
+#ask-input {
+  width: 100%; height: 36px; padding: 0 10px;
+  background: var(--card); color: var(--text);
+  border: 1px solid var(--line); border-bottom-color: var(--text-3);
+  border-radius: 5px; font: 14px var(--mono);
+}
+#ask-input:focus { outline: none; border-color: var(--accent); border-bottom-width: 2px; }
+#ask-error { margin-top: 8px; min-height: 16px; }
+
+.can-cell { display: flex; align-items: center; gap: 8px; }
+.can-cell input { flex: 1; min-width: 0; }
+.size {
+  flex: 0 0 auto; height: 30px; padding: 0 10px;
+  background: transparent; color: var(--text-3);
+  border: 1px solid var(--line); border-radius: 4px;
+  font: 12px var(--mono); cursor: pointer; font-variant-numeric: tabular-nums;
+}
+.size:hover { color: var(--text); border-color: var(--text-3); }
+
+/* The ask dialog is only ever opened from another dialog, so it has to paint
+   above one. Equal z-index left it behind the cans editor, where setting a
+   rack size looked like it did nothing at all. */
+#askdlg { z-index: 140; }

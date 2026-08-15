@@ -76,6 +76,26 @@
   </section>
 </main>
 
+<!-- Replaces window.prompt, which WKWebView does not implement at all, so on
+     macOS every one of these silently did nothing. -->
+<div id="askdlg" class="overlay hidden">
+  <div class="dialog narrow">
+    <header class="dlg-head">
+      <h2 id="ask-title">Edit</h2>
+      <p id="ask-hint"></p>
+    </header>
+    <div class="dlg-body">
+      <input id="ask-input" type="text" autocomplete="off" spellcheck="false">
+      <p id="ask-error" class="dlg-err"></p>
+    </div>
+    <footer class="dlg-foot">
+      <span style="flex:1"></span>
+      <button id="ask-cancel" class="tool">Cancel</button>
+      <button id="ask-ok" class="primary-sm">Save</button>
+    </footer>
+  </div>
+</div>
+
 <!-- Shown briefly on launch so the check is visible rather than invisible. -->
 <div id="toast" class="toast hidden">
   <span id="toast-spin" class="spin"></span>
@@ -106,7 +126,7 @@
   <div class="dialog">
     <header class="dlg-head">
       <h2>Cans at this site</h2>
-      <p>The rack shape for each can. Saved to <code>cans.json</code> — copy that
+      <p>The rack shape for each can. Saved to <code>cans.json</code>, copy that
          file to set up another machine the same way.
          <a href="#" id="showfiles">Show the folder</a></p>
     </header>
@@ -114,11 +134,18 @@
     <div class="dlg-body">
       <table class="cans-table">
         <thead>
-          <tr><th>Can</th><th class="n">Rows</th><th class="n">Columns</th><th class="n">Positions</th><th></th></tr>
+          <tr><th>Can</th><th></th></tr>
         </thead>
         <tbody id="cansrows"></tbody>
       </table>
-      <button id="addcan" class="tool addcan">+ Add a can</button>
+      <p id="cans-empty" class="cans-empty hidden">
+        No cans yet. Add them one at a time, or import a list from another machine.
+      </p>
+      <div class="cans-actions">
+        <button id="addcan" class="tool">+ Add a can</button>
+        <button id="importcans" class="tool">Import from a file</button>
+        <button id="examplecans" class="tool">Use an example list</button>
+      </div>
     </div>
 
     <footer class="dlg-foot">

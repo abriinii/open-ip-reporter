@@ -1,7 +1,7 @@
 # Screenshots
 
 Drop the images here using exactly these filenames. The README already links to
-them, so they appear as soon as they are pushed — nothing else needs editing.
+them, so they appear as soon as they are pushed, nothing else needs editing.
 
 ### macOS install (already captured)
 
@@ -29,7 +29,7 @@ Numbered to match the steps in the main README.
 | `win-04-run-anyway.png` | The expanded dialog, **Run anyway** |
 
 The firewall prompt has no screenshot. It appears only on a first run and is
-skipped entirely once a rule exists, so it is awkward to capture — and the
+skipped entirely once a rule exists, so it is awkward to capture, and the
 README explains it in words instead. Worth adding if it ever turns up on a
 clean machine.
 
@@ -37,7 +37,7 @@ clean machine.
 
 | Filename | What to capture |
 |---|---|
-| `04-app-empty.png` | The app open, before starting — used as the header image |
+| `04-app-empty.png` | The app open, before starting, used as the header image |
 | `05-walking.png` | Mid-walk with a few rows captured |
 | `06-cans.png` | The **Cans…** editor open |
 | `07-export.png` | The Save dialog from **Export CSV** |
@@ -64,7 +64,7 @@ safe as-is. It is `05-walking.png` onwards that need care.
 GitHub renders a README about 900px wide, so 1600 gives a sharp image on a
 Retina screen without a megabyte per file. Anything wider is just weight.
 
-The trick for uniformity is not resizing afterwards — it is **not resizing the
+The trick for uniformity is not resizing afterwards, it is **not resizing the
 window between shots**. The app opens at 1180x820, so every capture of it comes
 out identically sized on its own. Take all the app screenshots in one sitting,
 without dragging the window edges, and they already match.
@@ -80,14 +80,14 @@ It scales anything wider than 1600 down, **leaves smaller images alone** (the
 Windows dialogs are natively small and enlarging them only makes them blurry),
 strips the metadata macOS attaches, and flags any file over 500KB.
 
-The Windows prompts cannot be made to match the app window — Windows decides
+The Windows prompts cannot be made to match the app window, Windows decides
 their size. That is why the README puts them side by side in a table, where
 differing sizes stop mattering.
 
 ## Getting them in here
 
 Screenshot tools number files sequentially, so a folder of captures already
-sorts by filename into the order they were taken — which is the order of the
+sorts by filename into the order they were taken, which is the order of the
 steps. `import.sh` uses that to do the renaming:
 
 ```bash
@@ -96,7 +96,7 @@ steps. `import.sh` uses that to do the renaming:
 ```
 
 The sets are `mac` (9), `win` (4) and `app` (4). It changes nothing without
-`--apply`, so the order can be checked first — getting it wrong produces an
+`--apply`, so the order can be checked first, getting it wrong produces an
 install guide that confidently shows the wrong step.
 
 Point it at a folder holding only that one set. If the count does not match
@@ -118,12 +118,12 @@ The built-in <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>5</kbd> plus Preview's markup
 tools is enough, and needs nothing installed. If you would rather have a real
 tool for it:
 
-- **[Shottr](https://shottr.cc)** — free, and the one worth trying first. Has
+- **[Shottr](https://shottr.cc)**, free, and the one worth trying first. Has
   proper blur and redaction, which matters here: it is the easiest way to hide
   the MAC and IP columns before an image goes into a public repo.
-- **[Xnapper](https://xnapper.com)** — paid, and aimed squarely at this problem:
+- **[Xnapper](https://xnapper.com)**, paid, and aimed squarely at this problem:
   it auto-redacts things that look like addresses, and pads every capture to a
   uniform size. If the redaction step is the part you would forget, this is the
   one that remembers for you.
-- **[CleanShot X](https://cleanshot.com)** — paid, the most polished of the
+- **[CleanShot X](https://cleanshot.com)**, paid, the most polished of the
   three. Overkill for seven screenshots.

@@ -35,10 +35,15 @@ type Site struct {
 	Cans []Can `json:"cans"`
 }
 
-// Default is the layout this tool was first written for. It is a starting
-// point for a new install, not a fact: the first thing a different site does
-// is replace it.
-func Default() Site {
+// Empty is what a fresh install starts with: no cans at all.
+//
+// Shipping one site's layout as the default meant every new install began by
+// deleting a list of containers that meant nothing to it. An empty list makes
+// the first step obvious instead.
+func Empty() Site { return Site{} }
+
+// Example is a layout offered as a starting point, never applied on its own.
+func Example() Site {
 	return Site{Cans: []Can{
 		{Name: "A1", Rows: 10, Columns: 5},
 		{Name: "A2", Rows: 10, Columns: 5},
@@ -84,10 +89,10 @@ func (s Site) Has(name string) bool {
 
 // Validate checks the list is usable and says specifically what is wrong,
 // because this is edited by hand and the message is the whole error report.
+//
+// An empty list is valid. A new install has one, and refusing to save it would
+// leave no way to remove the last can.
 func (s Site) Validate() error {
-	if len(s.Cans) == 0 {
-		return fmt.Errorf("no cans defined")
-	}
 	seen := map[string]bool{}
 	for i, c := range s.Cans {
 		name := strings.TrimSpace(c.Name)
@@ -152,13 +157,11 @@ func splitName(name string) (prefix string, number int) {
 }
 
 // Load reads the site layout. A missing file is not an error: it means a fresh
-// install, which gets the defaults and writes them out so there is something
-// to edit.
+// install, which starts with no cans.
 func Load(path string) (Site, error) {
 	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
-		s := Default()
-		return s, s.Save(path)
+		return Empty(), nil
 	}
 	if err != nil {
 		return Site{}, err

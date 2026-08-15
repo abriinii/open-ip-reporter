@@ -23,6 +23,10 @@ func newTestApp(t *testing.T) *App {
 	a.sessionDir = dir
 	// Never let a test write a can list into the working copy.
 	a.cansPath = filepath.Join(dir, "cans.json")
+	a.settingsPath = filepath.Join(dir, "settings.json")
+	// A fresh install has no cans. These tests are about walking one, so they
+	// get a layout to walk.
+	a.layout = site.Example()
 	return a
 }
 

@@ -15,7 +15,7 @@ no longer silently shifts every pairing after it.
 ## Which file do I download?
 
 Go to the [**Releases**](../../releases/latest) page. There are two programs
-there — you almost certainly want the first one.
+there, you almost certainly want the first one.
 
 | Download this | If you want |
 |---|---|
@@ -26,7 +26,7 @@ Nothing to install either way. Unzip it and run what is inside.
 
 **The laptop must be plugged into the switch in the can you are walking.**
 Reports are layer-2 UDP broadcasts. They will not traverse a router, a VPN, or
-a Tailscale subnet route — only hosts on that segment will receive them.
+a Tailscale subnet route, only hosts on that segment will receive them.
 
 This bites hardest with Whatsminers. Antminer reports may still reach a desk
 elsewhere on site depending on your network setup, which makes it look as
@@ -50,7 +50,7 @@ Two clicks past a warning, and it runs. Nothing to install.
 **3. "Windows protected your PC" appears.** Click **More info**.
 
 This is SmartScreen saying the file has no reputation yet, not a virus
-detection — see [Why the warning appears](#why-the-warning-appears).
+detection, see [Why the warning appears](#why-the-warning-appears).
 
 ![SmartScreen warning](docs/images/win-03-smartscreen.png)
 
@@ -63,12 +63,12 @@ ticked. Miss this and the app runs but hears nothing at all, which looks
 exactly like a broken app. An administrator has to click it.
 
 This prompt only appears the first time, and not at all if a rule for the app
-already exists — which is why there is no screenshot of it here.
+already exists, which is why there is no screenshot of it here.
 
 ### Why the warning appears
 
 SmartScreen is not saying the file is malicious. It is saying it has no
-reputation — it has not been downloaded enough times for Microsoft to have an
+reputation, it has not been downloaded enough times for Microsoft to have an
 opinion about it. A tool used by one site will never accumulate that.
 
 Two ways to avoid it:
@@ -114,7 +114,7 @@ Then open it normally. Otherwise:
 **4. It gets blocked.** Click the **?** at the top right of that box. This opens
 Apple's "Apple can't check app for malicious software" page.
 
-Do this *before* dismissing the dialog — clicking Done first takes the **?**
+Do this *before* dismissing the dialog, clicking Done first takes the **?**
 away with it.
 
 ![Blocked, with the question mark](docs/images/mac-04-blocked.png)
@@ -162,10 +162,10 @@ xattr -d com.apple.quarantine capture-tool-macos-arm64
    report. The position is held open, which is what keeps everything after it
    aligned.
 4. Press **Stop** at the end of the rack, then **Export CSV**. Stopping keeps
-   the rack on screen — it ends the walk, it does not discard it.
+   the rack on screen, it ends the walk, it does not discard it.
 
 The **Row** and **Column** boxes show where the next machine will land. If you
-are off by one, type the right numbers in — the walk moves, nothing already
+are off by one, type the right numbers in, the walk moves, nothing already
 recorded is touched, and the rest of the rack follows on from there.
 
 ### Keys
@@ -188,7 +188,7 @@ mouse.
 ### Duplicates
 
 A MAC already in the rack will not be recorded a second time. You get
-`Already recorded at C1/5`, and the position does not advance — the next real
+`Already recorded at C1/5`, and the position does not advance, the next real
 machine takes it.
 
 Antminers send every report twice, one second apart, by design. That pair is
@@ -215,7 +215,7 @@ macOS     ~/Library/Application Support/OpenIPReporter
 ## The exported CSV
 
 One file per rack. Row *n* is grid position *n*, and a skipped position is a
-blank row — the same shape the existing process already consumes.
+blank row, the same shape the existing process already consumes.
 
 ```
 10.0.0.5,aa:bb:cc:dd:ee:ff
@@ -260,8 +260,12 @@ warning about cans that do not exist there.
 
 ## Cans and racks
 
-A fresh install ships with a starting list of cans and rack shapes, which you
-replace under **Cans…** with your own. Nothing about the layout is compiled in.
+A fresh install has no cans at all. Open **Cans…** and either add them one at a
+time, import a `cans.json` from a machine already set up, or start from an
+example list and edit it. Nothing about the layout is compiled in.
+
+The rack size sits behind the small button next to each name. It is set once
+per can and then never looked at again.
 
 Where a site numbers its cans in the addressing, the app works out which can a
 report came from and says so if it does not match the one being walked, rather
@@ -276,10 +280,10 @@ does not apply and the app stays quiet.
 |---|---|---|---|
 | **Antminer** | udp/14235 | `10.0.0.5,aa:bb:cc:dd:ee:ff` | Working |
 | **Whatsminer** | udp/8888 | `IP:10.0.0.5MAC:aa:bb:cc:dd:ee:ff` | Working |
-| Avalon, SealMiner | — | — | Not yet |
+| Avalon, SealMiner |, |, | Not yet |
 
 > **Whatsminer's button must be held for more than five seconds.** A short
-> press does nothing at all — no broadcast is sent. Hold it until the two
+> press does nothing at all, no broadcast is sent. Hold it until the two
 > right-hand LEDs flash. This is the single most likely reason a Whatsminer
 > appears not to report.
 
@@ -289,7 +293,7 @@ one walk rather than two tools.
 Adding a vendor is a new file in `internal/parse`, not a change to anything
 that already works.
 
-Note that no vendor's report contains a **serial number** — only IP and MAC.
+Note that no vendor's report contains a **serial number**, only IP and MAC.
 The serial can only come from the sitemap, which is exactly why position has to
 be recorded during the walk. It cannot be recovered afterwards.
 
@@ -316,7 +320,7 @@ sees every port with nothing to install. One run finds it permanently.
 
 Traffic appears the moment it starts, before you touch a miner. The most common
 is a 4-byte `01 00 00 00` on **udp/10001** every ~10 seconds from a pile of
-`.254` addresses — that is Ubiquiti UniFi device discovery, not miners.
+`.254` addresses, that is Ubiquiti UniFi device discovery, not miners.
 
 Repeated identical payloads collapse to a count automatically, and
 `-mute 10001` silences a port entirely. Neither affects the capture files:
@@ -340,7 +344,7 @@ appears in the corner while it checks, and the running version sits in the
 bottom-right of the status bar with the result next to it:
 
 ```
-v2.5.0 · up to date        checked and current — click it to read the notes
+v2.5.0 · up to date        checked and current, click it to read the notes
 v2.5.0 · offline           no route to the internet, which is normal in a can
 v2.5.0 · v2.6.0 available  click it to see the release notes again
 ```
@@ -351,7 +355,7 @@ with the release, replaces this copy and restarts. Nothing downloads unless you
 press it.
 
 An update installed this way arrives over HTTP rather than through a browser,
-so it carries neither Windows' Mark of the Web nor macOS' quarantine flag — the
+so it carries neither Windows' Mark of the Web nor macOS' quarantine flag, the
 new copy starts without the warning the first download had to be clicked past.
 
 If anything fails, the running copy is left untouched and the reason is shown.

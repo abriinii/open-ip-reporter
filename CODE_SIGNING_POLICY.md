@@ -79,8 +79,8 @@ It makes exactly one outbound request, and it is worth describing precisely:
 Beyond that: no telemetry, no analytics, no crash reporting, no account,
 licence key, or registration.
 
-Everything the program records — miner IP addresses, MAC addresses, notes and
-rack positions — is written only to files on the machine it runs on, in
+Everything the program records, miner IP addresses, MAC addresses, notes and
+rack positions, is written only to files on the machine it runs on, in
 `sessions/` and wherever you choose to export a CSV. **None of it is ever
 transmitted anywhere**, including in the update check. Nothing is written
 outside the working directory and the file you pick in the export dialog.

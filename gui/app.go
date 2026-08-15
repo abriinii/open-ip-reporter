@@ -80,7 +80,7 @@ func NewApp() *App {
 		// Seeded so the app is usable before startup has read the file, and so
 		// a failure to read it later degrades to the defaults rather than to an
 		// empty list with no cans to pick.
-		layout: site.Default(),
+		layout: site.Empty(),
 	}
 }
 
@@ -246,7 +246,7 @@ func (a *App) loadLayout() {
 	defer a.mu.Unlock()
 	loaded, err := site.Load(a.cansPath)
 	if err != nil {
-		a.layout = site.Default()
+		a.layout = site.Empty()
 		a.layoutErr = err.Error()
 		return
 	}
@@ -258,9 +258,6 @@ func (a *App) loadLayout() {
 func (a *App) Layout() []site.Can {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if len(a.layout.Cans) == 0 {
-		a.layout = site.Default()
-	}
 	return a.layout.Cans
 }
 
@@ -461,13 +458,38 @@ func (a *App) OpenReleasePage() {
 // Version is the running build, shown next to the update notice.
 func (a *App) Version() string { return a.version }
 
+// ImportLayout loads a can list from a file the operator picks, so a site set
+// up once can be copied to every other machine rather than typed again.
+func (a *App) ImportLayout() State {
+	path, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
+		Title:   "Import cans",
+		Filters: []runtime.FileFilter{{DisplayName: "Can list (*.json)", Pattern: "*.json"}},
+	})
+	if err != nil || path == "" {
+		return a.State() // cancelled
+	}
+
+	loaded, err := site.Load(path)
+	if err != nil {
+		a.mu.Lock()
+		defer a.mu.Unlock()
+		return a.stateLocked(err.Error())
+	}
+	if len(loaded.Cans) == 0 {
+		a.mu.Lock()
+		defer a.mu.Unlock()
+		return a.stateLocked("that file contains no cans")
+	}
+	return a.SaveLayout(loaded.Cans)
+}
+
+// ExampleLayout is a starting list, for someone with nothing to import.
+func (a *App) ExampleLayout() []site.Can { return site.Example().Cans }
+
 // Cans lists the cans that can be walked, in floor order.
 func (a *App) Cans() []string {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if len(a.layout.Cans) == 0 {
-		a.layout = site.Default()
-	}
 	return a.layout.Names()
 }
 
