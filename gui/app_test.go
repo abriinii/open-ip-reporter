@@ -581,3 +581,41 @@ func TestMigrationNeverOverwrites(t *testing.T) {
 		t.Errorf("the current can list was overwritten by an older one: %s", got)
 	}
 }
+
+// CheckForUpdate must return a finished result, not kick something off and
+// leave the window to work out when it landed. Every fault in this feature
+// came from the answer existing before or after whoever was looking for it.
+func TestCheckForUpdateReturnsTheFinishedResult(t *testing.T) {
+	a := newTestApp(t)
+	a.settingsPath = filepath.Join(t.TempDir(), "settings.json")
+	a.version = "v1.0.0"
+	a.updateRepo = "x/y"
+
+	// A deliberately slow reply, well past any polling window.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(300 * time.Millisecond)
+		w.Write([]byte(`{"tag_name":"v9.9.9","body":"Notes.","html_url":"https://example.test"}`))
+	}))
+	defer srv.Close()
+
+	orig := newChecker
+	newChecker = func(repo string) *update.Checker {
+		c := update.NewChecker(repo)
+		c.BaseURL = srv.URL
+		c.Client = srv.Client()
+		return c
+	}
+	defer func() { newChecker = orig }()
+
+	st := a.CheckForUpdate()
+
+	if st.UpdateState != "available" {
+		t.Fatalf("UpdateState = %q, want available on return", st.UpdateState)
+	}
+	if st.LatestVersion != "v9.9.9" {
+		t.Errorf("LatestVersion = %q on return; the window would have nothing to open", st.LatestVersion)
+	}
+	if st.LatestNotes != "Notes." {
+		t.Errorf("LatestNotes = %q on return", st.LatestNotes)
+	}
+}

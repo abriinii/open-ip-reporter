@@ -88,10 +88,6 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	a.loadLayout()
 	update.CleanUp() // remove the copy the last update moved aside
-	// Kicked from Go rather than waiting for the window to ask. The result is
-	// kept in State, so it is picked up on an ordinary render even if the
-	// event never arrives.
-	go a.checkForUpdate()
 	a.startListening()
 }
 
@@ -316,15 +312,15 @@ func (a *App) SetCheckForUpdates(on bool) {
 	a.saveSettings(s)
 }
 
-// CheckForUpdate asks GitHub whether a newer release exists and reports what
-// happened, so the window can show that it is checking rather than doing it
-// invisibly.
+// CheckForUpdate performs the check and returns the finished result.
 //
-// Called by the frontend once its event handlers are registered. Doing it from
-// startup instead would race: a fast reply arrives before anything is
-// listening and the result is simply lost.
-func (a *App) CheckForUpdate() {
-	go a.checkForUpdate()
+// It blocks. That is the point: the window asks once and gets an answer, with
+// no event to miss and no polling to give up too early. Every fault in this
+// feature came from a startup check, an event and a poll disagreeing about
+// when the answer existed.
+func (a *App) CheckForUpdate() State {
+	a.checkForUpdate()
+	return a.State()
 }
 
 // newChecker is a variable so tests can point the check at a stub instead of

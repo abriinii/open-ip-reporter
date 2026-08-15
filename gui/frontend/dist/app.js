@@ -547,8 +547,8 @@ function afterMinimum(fn) {
   setTimeout(fn, Math.max(0, TOAST_MIN_MS - waited));
 }
 
-// Called both from the State snapshot and from the event, whichever arrives.
-// Repeats of the same state are ignored so a re-render cannot restart a toast.
+// Repeats of the same state are ignored so an ordinary re-render cannot
+// restart the toast.
 let lastAppliedState = "";
 
 function applyUpdateState(stateName, s) {
@@ -594,31 +594,15 @@ function onUpdateStatus(s) {
   }
 }
 
-// The check runs in Go from startup, and nothing else triggers a render until
-// the first capture, so its result has to be collected here.
-//
-// This waits for an answer rather than sampling a few fixed times. A fixed
-// schedule stopped after five seconds, and on a slower connection the reply
-// landed after the last sample: the status was right but the version and notes
-// behind it were still empty, so the notice would not open and the link did
-// nothing until something else forced a render.
-async function pollUpdateStatus() {
-  const settled = new Set(["current", "available", "unreachable", "off", "dev"]);
-
-  for (let i = 0; i < 60; i++) {
-    const s = await call("State");
-    if (s) {
-      render(s);
-      const st = s.updateState;
-      if (settled.has(st)) {
-        // current and available also carry a version and notes; without those
-        // there is nothing to show yet, so keep waiting for them.
-        const needsDetail = st === "current" || st === "available";
-        if (!needsDetail || s.latestVersion) return;
-      }
-    }
-    await new Promise((r) => setTimeout(r, i < 8 ? 400 : 1500));
-  }
+// One call, one answer. It blocks in Go until GitHub replies or gives up, so
+// there is no event to miss and no polling to stop too early.
+async function runUpdateCheck() {
+  onUpdateStatus({ state: "checking" });
+  const s = await call("CheckForUpdate");
+  if (!s) { $("toast").classList.add("hidden"); return; }
+  state = s;
+  applyUpdateState(s.updateState, s);
+  setVersionLine();
 }
 
 // ---------- update notice ----------
@@ -732,7 +716,7 @@ async function boot() {
   render(await call("State"));
   setVersionLine();
 
-  pollUpdateStatus();
+  runUpdateCheck();
 }
 
 window.addEventListener("DOMContentLoaded", boot);
