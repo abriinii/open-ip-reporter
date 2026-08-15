@@ -218,17 +218,17 @@ One file per rack. Row *n* is grid position *n*, and a skipped position is a
 blank row — the same shape the existing process already consumes.
 
 ```
-21.1.1.43,02:81:f5:ea:e1:db
+10.0.0.5,aa:bb:cc:dd:ee:ff
 ,
-21.1.11.232,02:ad:af:02:ff:45
+10.0.0.7,aa:bb:cc:dd:ee:02
 ```
 
 If any row in the rack has a **note**, a third column is added to that file:
 
 ```
-21.1.1.43,02:81:f5:ea:e1:db,
+10.0.0.5,aa:bb:cc:dd:ee:ff,
 ,,wont ip report
-21.1.11.232,02:ad:af:02:ff:45,
+10.0.0.7,aa:bb:cc:dd:ee:02,
 ```
 
 A rack with no notes exports exactly the two-column form, so nothing changes
@@ -253,27 +253,20 @@ copying that one file across. **Show the folder** in that dialog opens the
 right place. A fresh install writes the list below as a starting point;
 replacing it entirely is the expected thing to do somewhere else.
 
-One thing that does not travel: the can is normally inferred from a report's
-source address using this site's addressing scheme. Somewhere addressed
-differently that inference simply does not apply, and the app stays quiet
-rather than warning about cans that do not exist there.
+One thing that does not travel: where a report came from is worked out from
+its address, which depends on how the site is numbered. Somewhere addressed
+differently that check does not apply, and the app stays quiet rather than
+warning about cans that do not exist there.
 
 ## Cans and racks
 
-The defaults for this site, editable under **Cans…**:
+A fresh install ships with a starting list of cans and rack shapes, which you
+replace under **Cans…** with your own. Nothing about the layout is compiled in.
 
-| Cans | Rows | Columns | Positions |
-|---|---|---|---|
-| A1, A2, A5, A6, A7, A8, B1–B4 | 10 | 5 | 50 |
-| O1, O2, O3 (outdoor) | 8 | 6 | 48 |
-
-A3 and A4 are out of commission. There is no O4 — `34.x` is the testbench, and
-a capture from that range labels itself as such.
-
-The can is derived from the source address of every report: the first octet
-encodes it, `1x` → A, `2x` → B, `3x` → O. A machine answering from
-`15.4.9.113` is in A5. If a report arrives from a different can than the one
-being walked, the app says so rather than recording it quietly.
+Where a site numbers its cans in the addressing, the app works out which can a
+report came from and says so if it does not match the one being walked, rather
+than recording it quietly. Somewhere addressed differently that check simply
+does not apply and the app stays quiet.
 
 ---
 
