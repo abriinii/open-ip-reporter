@@ -19,10 +19,10 @@ there — you almost certainly want the first one.
 
 | Download this | If you want |
 |---|---|
-| **`OpenIPReporter-windows-x64.exe`**<br>**`OpenIPReporter-macos-arm64.zip`** | **The app.** A window you walk a rack with. This is the one. |
+| **`OpenIPReporter-windows-x64.zip`**<br>**`OpenIPReporter-macos-arm64.zip`** | **The app.** A window you walk a rack with. This is the one. |
 | `capture-tool-windows-x64.exe`<br>`capture-tool-macos-arm64` | A command-line tool for recording raw miner broadcasts. Only needed when a miner type is not recognised yet and its wire format has to be worked out. |
 
-Nothing to install either way. One file, download and run.
+Nothing to install either way. Unzip it and run what is inside.
 
 **The laptop must be plugged into the switch in the can you are walking.**
 Reports are layer-2 UDP broadcasts. They will not traverse a router, a VPN, or
@@ -38,11 +38,12 @@ first.**
 
 Two clicks past a warning, and it runs. Nothing to install.
 
-**1. Download `OpenIPReporter-windows-x64.exe`** from the Releases page.
+**1. Download `OpenIPReporter-windows-x64.zip`** from the Releases page.
 
 ![Downloading the release](docs/images/win-01-download.png)
 
-**2. Open it** from your browser's downloads.
+**2. Unzip it** and open the `OpenIPReporter` folder, then run
+`OpenIPReporter.exe`.
 
 ![The finished download](docs/images/win-02-downloaded.png)
 

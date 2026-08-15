@@ -62,9 +62,16 @@ jobs:
               ditto -c -k --keepParent OpenIPReporter.app ../../../dist/OpenIPReporter-macos-arm64.zip
           - os: windows-latest
             platform: windows/amd64
+            # Zipped into a folder rather than served as a loose .exe, so
+            # unpacking it leaves one tidy directory instead of scattering an
+            # executable through someone's Downloads.
             package: |
-              mkdir -p dist
-              cp gui/build/bin/OpenIPReporter.exe dist/OpenIPReporter-windows-x64.exe
+              mkdir -p dist/OpenIPReporter
+              cp gui/build/bin/OpenIPReporter.exe dist/OpenIPReporter/OpenIPReporter.exe
+              cp "packaging/windows/Read me first.txt" dist/OpenIPReporter/
+              cd dist
+              powershell -NoProfile -Command "Compress-Archive -Path 'OpenIPReporter' -DestinationPath 'OpenIPReporter-windows-x64.zip' -Force"
+              rm -rf OpenIPReporter
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4

@@ -1,0 +1,34 @@
+OpenIPReporter
+==============
+
+Run OpenIPReporter.exe. There is nothing to install.
+
+Keep this folder wherever you like. The program stores its can list, settings
+and in-progress walks in your user profile, not in here, so moving or copying
+this folder will not lose anything.
+
+
+FIRST RUN
+---------
+
+Windows shows "Windows protected your PC". Click "More info", then
+"Run anyway".
+
+That warning means the file has no download reputation yet, not that anything
+is wrong with it. To skip it, right-click OpenIPReporter.exe, choose
+Properties, tick Unblock, and click OK before running.
+
+Windows Defender Firewall then asks whether to allow it. Click Allow and make
+sure "Private networks" is ticked. Without this the program runs but never
+hears a miner.
+
+
+IMPORTANT
+---------
+
+The laptop has to be plugged into the switch in the can you are walking.
+Miner reports are broadcasts that do not cross routers or VPNs.
+
+
+Full instructions, and the source:
+https://github.com/abriinii/open-ip-reporter
