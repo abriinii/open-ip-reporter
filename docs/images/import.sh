@@ -61,11 +61,17 @@ case "$SET" in
   *)   usage ;;
 esac
 
-# Oldest first: the order they were taken.
+# Sorted by filename, not by timestamp.
+#
+# Screenshot tools number sequentially and macOS names by date, so either way
+# the names sort into the order the shots were taken. Modification time does
+# not: copying or AirDropping a folder rewrites it, and the first file copied
+# then looks like the first taken. That happened, and it silently shifted every
+# screenshot one step out of place.
 files=()
 while IFS= read -r f; do files+=("$f"); done < <(
   find "$SRC" -maxdepth 1 -type f \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' \) \
-    -exec stat -f '%m %N' {} + 2>/dev/null | sort -n | cut -d' ' -f2-
+    2>/dev/null | sort
 )
 
 if [ ${#files[@]} -eq 0 ]; then
@@ -73,7 +79,7 @@ if [ ${#files[@]} -eq 0 ]; then
   exit 1
 fi
 
-echo "Found ${#files[@]} image(s) in $SRC, oldest first."
+echo "Found ${#files[@]} image(s) in $SRC, in filename order."
 echo "The '$SET' set expects ${#names[@]}."
 echo
 

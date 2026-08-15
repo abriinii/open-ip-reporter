@@ -86,9 +86,9 @@ differing sizes stop mattering.
 
 ## Getting them in here
 
-Screenshot tools name files by timestamp, so a folder of captures already sorts
-into the order they were taken — which is the order of the steps. `import.sh`
-uses that to do the renaming:
+Screenshot tools number files sequentially, so a folder of captures already
+sorts by filename into the order they were taken — which is the order of the
+steps. `import.sh` uses that to do the renaming:
 
 ```bash
 ./docs/images/import.sh ~/Desktop mac            # shows what it would do
